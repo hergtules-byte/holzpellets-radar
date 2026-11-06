@@ -30,12 +30,16 @@ jobs:
           VERGABEWEISER_API_KEY: ${{ secrets.VERGABEWEISER_API_KEY }}
         run: python update_data.py
 
+     
       - name: Ergebnisse speichern
         run: |
           git config user.name "Holzpellets Radar Bot"
           git config user.email "actions@users.noreply.github.com"
+
           git add data/latest.json
-          git diff --cached --quiet || (
-            git commit -m "Tägliche Aktualisierung"
-            git push
-          )
+
+          git diff --cached --quiet || git commit -m "Tägliche Aktualisierung"
+
+          git pull --rebase origin main
+          git push origin HEAD:main
+
