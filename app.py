@@ -1,326 +1,346 @@
 
 import json
-import time
 from pathlib import Path
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
-import requests
 import streamlit as st
 
+# =====================================
+# SEITENEINSTELLUNGEN
+# =====================================
+
 st.set_page_config(
-    page_title="Holzpellets-Radar",
+    page_title="Holzpellets-Ausschreibungsradar",
     page_icon="🌲",
     layout="wide"
 )
 
-STATES = {
-    "Brandenburg": "brandenburg",
-    "Mecklenburg-Vorpommern": "mecklenburg-vorpommern",
-    "Sachsen": "sachsen",
-    "Sachsen-Anhalt": "sachsen-anhalt",
-    "Thüringen": "thueringen"
-}
+STATES = [
+    "Brandenburg",
+    "Mecklenburg-Vorpommern",
+    "Sachsen",
+    "Sachsen-Anhalt",
+    "Thüringen"
+]
 
-API = "https://vergabeweiser.de/api/v1/tenders"
 DATA_FILE = Path("data/latest.json")
 
 
+# =====================================
+# DATEN LADEN
+# =====================================
+
 def load_data():
-    if DATA_FILE.exists():
-        try:
-            return json.loads(
-                DATA_FILE.read_text(encoding="utf-8")
-            )
-        except Exception:
-            pass
-
-    return {
-        "updated_at": None,
-        "results": [],
-        "errors": []
-    }
-
-
-def search_state(state, slug, api_key):
-    params = {
-        "was": "Holzpellets",
-        "land": slug,
-        "status": "offen",
-        "sort": "neu",
-        "seite": 1
-    }
-
-    headers = {
-        "User-Agent": "Holzpellets-Radar/2.0",
-        "Authorization": f"Bearer {api_key}"
-    }
+    if not DATA_FILE.exists():
+        return {
+            "updated_at": None,
+            "results": [],
+            "errors": []
+        }
 
     try:
-        response = requests.get(
-            API,
-            params=params,
-            headers=headers,
-            timeout=45
+        return json.loads(
+            DATA_FILE.read_text(encoding="utf-8")
         )
-
-        if response.status_code == 429:
-            return [], [
-                "API-Limit erreicht. Bitte später erneut versuchen."
-            ]
-
-        response.raise_for_status()
-        data = response.json()
-
-        results = []
-
-        for item in data.get("results", []):
-            buyer = item.get("buyer") or {}
-            place = item.get("place") or {}
-            deadline = item.get("deadline") or {}
-
-            results.append({
-                "id": item.get("id", ""),
-                "state": state,
-                "title": (
-                    item.get("title")
-                    or item.get("original_title")
-                    or "Holzpellet-Ausschreibung"
-                ),
-                "buyer": (
-                    buyer.get("name", "")
-                    if isinstance(buyer, dict)
-                    else str(buyer)
-                ),
-                "place": (
-                    place.get("text")
-                    or place.get("city")
-                    or state
-                ),
-                "deadline": (
-                    deadline.get("label", "")
-                    if isinstance(deadline, dict)
-                    else str(deadline)
-                ),
-                "published": item.get("published_on") or "",
-                "url": item.get("url") or "",
-                "source": "Vergabeweiser"
-            })
-
-        return results, []
-
-    except requests.exceptions.RequestException as error:
-        return [], [str(error)]
-
     except Exception as error:
-        return [], [str(error)]
+        st.error(f"Fehler beim Lesen der Daten: {error}")
+        return {
+            "updated_at": None,
+            "results": [],
+            "errors": ["Datendatei konnte nicht gelesen werden."]
+        }
 
 
-def run_search(api_key):
-    all_results = []
-    all_errors = []
+# =====================================
+# KATEGORIEN ZUORDNEN
+# =====================================
 
-    progress = st.progress(0)
+def get_category(item):
 
-    for i, (state, slug) in enumerate(
-        STATES.items(), start=1
+    check = (
+        item.get("woodpellet_check") or ""
+    ).lower()
+
+    title = (
+        item.get("title") or ""
+    ).lower()
+
+    description = (
+        item.get("description") or ""
+    ).lower()
+
+    text = title + " " + description
+
+    if "holzpellets eindeutig" in check:
+        return "Holzpellet-Ausschreibungen"
+
+    if "pellets – holzart prüfen" in check:
+        return "Pellet-Projekte"
+
+    if "pellets - holzart prüfen" in check:
+        return "Pellet-Projekte"
+
+    if "pellet" in check:
+        return "Pellet-Projekte"
+
+    if (
+        "hackschnitzel" in check
+        or "holzbrennstoff" in check
+        or "holzbrikett" in check
+        or "cpv 09111400" in check
     ):
-        st.write("Durchsuche:", state)
+        return "Weitere Holzbrennstoffe"
 
-        found, errors = search_state(
-            state, slug, api_key
+    if "holzpellet" in text:
+        return "Holzpellet-Ausschreibungen"
+
+    if "pellet" in text:
+        return "Pellet-Projekte"
+
+    if (
+        "hackschnitzel" in text
+        or "holzbrikett" in text
+        or "holzbrennstoff" in text
+    ):
+        return "Weitere Holzbrennstoffe"
+
+    return "Weitere Holzbrennstoffe"
+
+
+# =====================================
+# EINZELNE AUSSCHREIBUNG ANZEIGEN
+# =====================================
+
+def show_tender(item):
+
+    st.markdown(
+        "#### " + (
+            item.get("title")
+            or "Ausschreibung ohne Titel"
         )
-
-        all_results.extend(found)
-
-        for error in errors:
-            all_errors.append(state + ": " + error)
-
-        progress.progress(i / len(STATES))
-
-        # Kurze Pause zwischen den Anfragen
-        time.sleep(3)
-
-    unique = {}
-
-    for item in all_results:
-        key = (
-            item.get("id")
-            or item.get("url")
-            or item.get("title")
-        )
-        unique[str(key)] = item
-
-    results = list(unique.values())
-
-    results.sort(
-        key=lambda x: x.get("published") or "",
-        reverse=True
     )
 
-    snapshot = {
-        "updated_at": datetime.now(
-            ZoneInfo("Europe/Berlin")
-        ).isoformat(timespec="seconds"),
-        "results": results,
-        "errors": all_errors
-    }
+    col1, col2 = st.columns(2)
 
-    DATA_FILE.parent.mkdir(exist_ok=True)
+    with col1:
+        st.write(
+            "**Auftraggeber:**",
+            item.get("buyer") or "Nicht angegeben"
+        )
 
-    DATA_FILE.write_text(
-        json.dumps(
-            snapshot,
-            ensure_ascii=False,
-            indent=2
-        ),
-        encoding="utf-8"
-    )
+        st.write(
+            "**Ort:**",
+            item.get("place") or "Nicht angegeben"
+        )
 
-    progress.empty()
+    with col2:
+        st.write(
+            "**Angebotsfrist:**",
+            item.get("deadline") or "Nicht angegeben"
+        )
 
-    return snapshot
+        st.write(
+            "**Veröffentlicht:**",
+            item.get("published") or "Nicht angegeben"
+        )
+
+    if item.get("description"):
+        with st.expander("Beschreibung anzeigen"):
+            st.write(item["description"])
+
+    if item.get("cpv"):
+        st.caption("CPV: " + str(item["cpv"]))
+
+    if item.get("woodpellet_check"):
+        st.caption(
+            "Einstufung: "
+            + item["woodpellet_check"]
+        )
+
+    links = []
+
+    for key, label in [
+        ("url", "Originalausschreibung"),
+        ("notice_url", "Bekanntmachung"),
+        ("documents_url", "Vergabeunterlagen")
+    ]:
+        url = item.get(key)
+
+        if (
+            isinstance(url, str)
+            and url.startswith("https://")
+            and url not in [x[1] for x in links]
+        ):
+            links.append((label, url))
+
+    if links:
+        for label, url in links:
+            st.markdown(
+                f"[{label} öffnen ↗]({url})"
+            )
+
+    st.caption("Quelle: Vergabeweiser")
+    st.divider()
 
 
-# Hauptseite
+# =====================================
+# HAUPTSEITE
+# =====================================
 
 st.title("🌲 Holzpellets-Ausschreibungsradar")
 
 st.caption(
-    "Tägliche Suche in den fünf neuen Bundesländern"
+    "Tägliche Suche nach Ausschreibungen "
+    "in den fünf neuen Bundesländern"
 )
 
 data = load_data()
 
-api_key = st.secrets.get(
-    "VERGABEWEISER_API_KEY", ""
-)
-
-if not api_key:
-    st.error(
-        "API-Schlüssel fehlt. Bitte Streamlit-Secrets prüfen."
-    )
-    st.stop()
-
-
-if st.sidebar.button(
-    "🔄 Jetzt suchen",
-    type="primary"
-):
-    with st.spinner(
-        "Suche läuft. Bitte etwas Geduld ..."
-    ):
-        data = run_search(api_key)
-
-    st.rerun()
-
+results = data.get("results", [])
+errors = data.get("errors", [])
 
 if data.get("updated_at"):
     st.caption(
         "Letzte Aktualisierung: "
-        + data["updated_at"]
+        + str(data["updated_at"])
     )
 else:
-    st.info("Noch keine Suchdaten vorhanden.")
-
-
-errors = data.get("errors", [])
-results = data.get("results", [])
-
-if errors:
-    st.error(
-        "Die Suche war nicht vollständig erfolgreich."
+    st.info(
+        "Noch keine Suchdaten vorhanden."
     )
 
-    with st.expander(
-        "Suchfehler anzeigen",
-        expanded=True
-    ):
+# =====================================
+# FEHLERHINWEISE
+# =====================================
+
+if errors:
+    st.warning(
+        "Die Suche war teilweise oder vollständig "
+        "nicht erfolgreich. Bitte Hinweise prüfen."
+    )
+
+    with st.expander("Suchfehler anzeigen"):
         for error in errors:
-            st.write("• " + error)
+            st.write("• " + str(error))
 
 
-st.metric(
-    "Gefundene Ausschreibungen",
-    len(results)
-)
+# =====================================
+# ERGEBNISSE EINORDNEN
+# =====================================
 
+categories = {
+    "Holzpellet-Ausschreibungen": [],
+    "Pellet-Projekte": [],
+    "Weitere Holzbrennstoffe": []
+}
+
+for item in results:
+    category = get_category(item)
+    categories[category].append(item)
+
+
+# =====================================
+# ÜBERSICHT
+# =====================================
+
+st.subheader("Gesamtübersicht")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.metric(
+        "Alle Treffer",
+        len(results)
+    )
+
+with col2:
+    st.metric(
+        "Holzpellet-Ausschreibungen",
+        len(categories["Holzpellet-Ausschreibungen"])
+    )
+
+with col3:
+    st.metric(
+        "Pellet-Projekte",
+        len(categories["Pellet-Projekte"])
+    )
+
+with col4:
+    st.metric(
+        "Weitere Holzbrennstoffe",
+        len(categories["Weitere Holzbrennstoffe"])
+    )
+
+
+# =====================================
+# BUNDESLÄNDER
+# =====================================
+
+st.subheader("Ausschreibungen nach Bundesland")
 
 for state in STATES:
+
     state_results = [
         item for item in results
         if item.get("state") == state
     ]
 
     with st.container(border=True):
-        st.subheader(state)
+
+        st.header(state)
 
         st.write(
-            "Gefundene Ausschreibungen:",
-            len(state_results)
+            f"Gefundene Treffer: {len(state_results)}"
         )
 
-        if not state_results:
-            if errors:
-                st.warning(
-                    "Keine bestätigten Treffer. "
-                    "Die Suche war möglicherweise unvollständig."
-                )
-            elif data.get("updated_at"):
-                st.success(
-                    "Keine passenden Ausschreibungen gefunden."
-                )
-            else:
-                st.info("Noch keine Suche durchgeführt.")
+        for category_name in [
+            "Holzpellet-Ausschreibungen",
+            "Pellet-Projekte",
+            "Weitere Holzbrennstoffe"
+        ]:
 
-        for item in state_results:
-            st.markdown(
-                "### " + item["title"]
-            )
+            category_results = [
+                item for item in state_results
+                if get_category(item) == category_name
+            ]
 
-            if item["buyer"]:
-                st.write(
-                    "Auftraggeber:",
-                    item["buyer"]
-                )
+            with st.expander(
+                f"{category_name} ({len(category_results)})",
+                expanded=bool(category_results)
+            ):
 
-            if item["place"]:
-                st.write(
-                    "Ort:",
-                    item["place"]
-                )
+                if category_results:
+                    for item in category_results:
+                        show_tender(item)
 
-            if item["deadline"]:
-                st.write(
-                    "Angebotsfrist:",
-                    item["deadline"]
-                )
+                else:
+                    if errors:
+                        st.warning(
+                            "Keine bestätigten Treffer. "
+                            "Die Suche war möglicherweise unvollständig."
+                        )
+                    elif data.get("updated_at"):
+                        st.success(
+                            "Keine passenden Ausschreibungen gefunden."
+                        )
+                    else:
+                        st.info(
+                            "Noch keine Suche durchgeführt."
+                        )
 
-            if item["published"]:
-                st.write(
-                    "Veröffentlicht:",
-                    item["published"]
-                )
 
-            if item["url"]:
-                st.markdown(
-                    f"[Zur Originalausschreibung ↗]({item['url']})"
-                )
+# =====================================
+# ABSCHLUSS
+# =====================================
 
-            st.caption(
-                "Quelle: Vergabeweiser"
-            )
-
-            st.divider()
-
+st.divider()
 
 st.caption(
     "Bitte Angebotsfristen und Vergabeunterlagen "
     "immer in der Originalbekanntmachung prüfen. "
-    "Eine vollständige Erfassung aller Ausschreibungen "
-    "kann nicht garantiert werden."
+    "Die Suche kann keine vollständige Erfassung "
+    "aller Ausschreibungen garantieren."
 )
 
 st.markdown(
-    "[Vergabeweiser – API und Datenquelle](https://vergabeweiser.de/api)"
+    "[Vergabeweiser – API und Datenquelle]"
+    "(https://vergabeweiser.de/api)"
 )
