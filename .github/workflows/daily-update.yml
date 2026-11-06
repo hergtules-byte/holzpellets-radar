@@ -40,6 +40,6 @@ jobs:
 
           git diff --cached --quiet || git commit -m "Tägliche Aktualisierung"
 
-          git pull --rebase origin main
+          git pull --rebase -X theirs origin main
           git push origin HEAD:main
 
