@@ -1,9 +1,9 @@
 
+import os
 import json
 import time
-import os
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import requests
@@ -17,125 +17,104 @@ STATES = {
 }
 
 API = "https://vergabeweiser.de/api/v1/tenders"
+DATA_FILE = Path("data/latest.json")
 
-def search_state(state, slug):
-    params = {
-        "was": "Holzpellets",
-        "land": slug,
-        "status": "offen",
-        "sort": "neu",
-        "seite": 1
-    }
+api_key = os.environ.get("VERGABEWEISER_API_KEY")
 
-   headers = {
-    "User-Agent": "Holzpellets-Radar/2.0",
-    "Authorization": f"Bearer {os.environ['VERGABEWEISER_API_KEY']}"
+if not api_key:
+    raise RuntimeError(
+        "GitHub Secret VERGABEWEISER_API_KEY fehlt."
+    )
+
+headers = {
+    "Authorization": f"Bearer {api_key}",
+    "User-Agent": "Holzpellets-Radar/2.0"
 }
-
-    for attempt in range(3):
-        try:
-            response = requests.get(
-                API,
-                params=params,
-                headers=headers,
-                timeout=45
-            )
-
-            if response.status_code == 429:
-                wait = int(response.headers.get("Retry-After", "30"))
-
-                if attempt == 2 or wait > 120:
-                    return [], [
-                        f"Rate-Limit erreicht. Bitte später erneut versuchen. "
-                        f"Wartezeit laut Server: {wait} Sekunden."
-                    ]
-
-                time.sleep(max(wait, 5))
-                continue
-
-            response.raise_for_status()
-            data = response.json()
-
-            results = []
-
-            for item in data.get("results", []):
-                title = (
-                    item.get("title")
-                    or item.get("original_title")
-                    or ""
-                )
-
-                # Nur echte Holzpellet-Treffer übernehmen
-                search_text = (
-                    title + " " +
-                    str(item.get("original_title") or "") + " " +
-                    str(item.get("gewerk") or "")
-                ).lower()
-
-                if "pellet" not in search_text:
-                    continue
-
-                buyer = item.get("buyer") or {}
-                place = item.get("place") or {}
-                deadline = item.get("deadline") or {}
-
-                results.append({
-                    "id": item.get("id", ""),
-                    "state": state,
-                    "title": title,
-                    "buyer": (
-                        buyer.get("name", "")
-                        if isinstance(buyer, dict)
-                        else str(buyer)
-                    ),
-                    "place": (
-                        place.get("text")
-                        or place.get("city")
-                        or place.get("land")
-                        or state
-                    ),
-                    "deadline": (
-                        deadline.get("label", "")
-                        if isinstance(deadline, dict)
-                        else str(deadline)
-                    ),
-                    "published": item.get("published_on") or "",
-                    "url": item.get("url") or "",
-                    "source": "Vergabeweiser"
-                })
-
-            return results, []
-
-        except Exception as error:
-            if attempt == 2:
-                return [], [str(error)]
-
-            time.sleep(5 * (attempt + 1))
-
-    return [], ["Suche konnte nicht abgeschlossen werden."]
-
 
 all_results = []
 all_errors = []
 
 for state, slug in STATES.items():
-    print("Suche:", state)
+    print("Durchsuche:", state)
 
-    results, errors = search_state(state, slug)
+    try:
+        response = requests.get(
+            API,
+            params={
+                "was": "Holzpellets",
+                "land": slug,
+                "status": "offen",
+                "sort": "neu",
+                "seite": 1
+            },
+            headers=headers,
+            timeout=45
+        )
 
-    all_results.extend(results)
-    all_errors.extend([
-        state + ": " + error for error in errors
-    ])
+        if response.status_code == 429:
+            wait = response.headers.get(
+                "Retry-After", "unbekannt"
+            )
+            all_errors.append(
+                f"{state}: API-Limit erreicht. "
+                f"Retry-After: {wait}"
+            )
+            print("API-Limit erreicht:", state)
+            continue
 
-    # Anfragen zeitlich entzerren
-    time.sleep(5)
+        response.raise_for_status()
+        data = response.json()
 
-# Doppelte Ergebnisse entfernen
+        for item in data.get("results", []):
+            title = (
+                item.get("title")
+                or item.get("original_title")
+                or "Holzpellet-Ausschreibung"
+            )
+
+            all_results.append({
+                "id": item.get("id", ""),
+                "state": state,
+                "title": title,
+                "buyer": (
+                    (item.get("buyer") or {}).get("name", "")
+                ),
+                "place": (
+                    (item.get("place") or {}).get("text")
+                    or (item.get("place") or {}).get("city")
+                    or state
+                ),
+                "deadline": (
+                    (item.get("deadline") or {}).get("label", "")
+                ),
+                "published": item.get("published_on") or "",
+                "url": item.get("url") or "",
+                "source": "Vergabeweiser"
+            })
+
+        print(
+            state,
+            "- Treffer:",
+            len(data.get("results", []))
+        )
+
+    except Exception as error:
+        all_errors.append(
+            f"{state}: {str(error)}"
+        )
+        print("Fehler:", state, error)
+
+    time.sleep(3)
+
+# Doppelte Ausschreibungen entfernen
 unique = {}
 
 for item in all_results:
-    key = item.get("id") or item.get("url") or item.get("title")
+    key = (
+        item.get("id")
+        or item.get("url")
+        or item.get("title")
+    )
     unique[str(key)] = item
 
 results = list(unique.values())
@@ -145,7 +124,11 @@ results.sort(
     reverse=True
 )
 
-Path("data").mkdir(exist_ok=True)
+# Ergebnisse speichern
+DATA_FILE.parent.mkdir(
+    parents=True,
+    exist_ok=True
+)
 
 snapshot = {
     "updated_at": datetime.now(
@@ -155,11 +138,20 @@ snapshot = {
     "errors": all_errors
 }
 
-Path("data/latest.json").write_text(
-    json.dumps(snapshot, ensure_ascii=False, indent=2),
+DATA_FILE.write_text(
+    json.dumps(
+        snapshot,
+        ensure_ascii=False,
+        indent=2
+    ),
     encoding="utf-8"
 )
 
-print("Suchlauf beendet.")
-print("Gefundene Ausschreibungen:", len(results))
+print("--------------------------------")
+print("Holzpellets-Radar abgeschlossen")
+print("Treffer:", len(results))
 print("Fehler:", len(all_errors))
+print("--------------------------------")
+
+if all_errors:
+    print("WARNUNG: Suche teilweise unvollständig.")
