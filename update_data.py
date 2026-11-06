@@ -82,6 +82,10 @@ for state, slug in STATES.items():
 
             print("Suchverständnis:", data.get("understood"))
             print("Gesamtzahl laut API:", data.get("total"))
+                        print("Beispieltitel:", [
+                r.get("title") or r.get("original_title")
+                for r in data.get("results", [])[:5]
+            ])
 
             for item in data.get("results", []):
 
