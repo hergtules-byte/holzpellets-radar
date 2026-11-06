@@ -14,13 +14,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Repository laden
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Python einrichten
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Python installieren
+      - name: Abhängigkeiten installieren
         run: pip install requests
 
       - name: Ausschreibungen suchen
