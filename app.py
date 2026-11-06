@@ -42,13 +42,7 @@ def load_data():
     }
 
 
-
-def search_state(state, slug):
-    api_key = st.secrets.get("VERGABEWEISER_API_KEY", "")
-
-    if not api_key:
-        return [], ["API-Schlüssel fehlt in den Streamlit-Secrets."]
-
+def search_state(state, slug, api_key):
     params = {
         "was": "Holzpellets",
         "land": slug,
@@ -62,194 +56,69 @@ def search_state(state, slug):
         "Authorization": f"Bearer {api_key}"
     }
 
-    for attempt in range(3):
-        try:
-            response = requests.get(
-                API,
-                params=params,
-                headers=headers,
-                timeout=45
-            )
+    try:
+        response = requests.get(
+            API,
+            params=params,
+            headers=headers,
+            timeout=45
+        )
 
-            if response.status_code == 429:
-                wait = int(
-                    response.headers.get("Retry-After", "60")
-                )
+        if response.status_code == 429:
+            return [], [
+                "API-Limit erreicht. Bitte später erneut versuchen."
+            ]
 
-                if attempt == 2 or wait > 120:
-                    return [], [
-                        "Rate-Limit erreicht. Bitte später erneut versuchen."
-                    ]
+        response.raise_for_status()
+        data = response.json()
 
-                time.sleep(max(wait, 5))
-                continue
+        results = []
 
-            response.raise_for_status()
-            data = response.json()
+        for item in data.get("results", []):
+            buyer = item.get("buyer") or {}
+            place = item.get("place") or {}
+            deadline = item.get("deadline") or {}
 
-            results = []
-
-            for item in data.get("results", []):
-                title = (
+            results.append({
+                "id": item.get("id", ""),
+                "state": state,
+                "title": (
                     item.get("title")
                     or item.get("original_title")
-                    or ""
-                )
+                    or "Holzpellet-Ausschreibung"
+                ),
+                "buyer": (
+                    buyer.get("name", "")
+                    if isinstance(buyer, dict)
+                    else str(buyer)
+                ),
+                "place": (
+                    place.get("text")
+                    or place.get("city")
+                    or state
+                ),
+                "deadline": (
+                    deadline.get("label", "")
+                    if isinstance(deadline, dict)
+                    else str(deadline)
+                ),
+                "published": item.get("published_on") or "",
+                "url": item.get("url") or "",
+                "source": "Vergabeweiser"
+            })
 
-                search_text = (
-                    title + " " +
-                    str(item.get("original_title") or "") + " " +
-                    str(item.get("gewerk") or "")
-                ).lower()
+        return results, []
 
-                if "pellet" not in search_text:
-                    continue
+    except requests.exceptions.RequestException as error:
+        return [], [str(error)]
 
-                buyer = item.get("buyer") or {}
-                place = item.get("place") or {}
-                deadline = item.get("deadline") or {}
-
-                results.append({
-                    "id": item.get("id", ""),
-                    "state": state,
-                    "title": title,
-                    "buyer": (
-                        buyer.get("name", "")
-                        if isinstance(buyer, dict)
-                        else str(buyer)
-                    ),
-                    "place": (
-                        place.get("text")
-                        or place.get("city")
-                        or state
-                    ),
-                    "deadline": (
-                        deadline.get("label", "")
-                        if isinstance(deadline, dict)
-                        else str(deadline)
-                    ),
-                    "published": item.get("published_on") or "",
-                    "url": item.get("url") or "",
-                    "source": "Vergabeweiser"
-                })
-
-            return results, []
-
-        except Exception as error:
-            if attempt == 2:
-                return [], [str(error)]
-
-            time.sleep(5 * (attempt + 1))
-
-    return [], ["Suche nicht abgeschlossen."]
-
-    }
-
-    for attempt in range(3):
-        try:
-            api_key = st.secrets.get("VERGABEWEISER_API_KEY", "")
-
-if not api_key:
-    return [], ["API-Schlüssel fehlt in den Streamlit-Secrets."]
+    except Exception as error:
+        return [], [str(error)]
 
 
-api_key = st.secrets.get("VERGABEWEISER_API_KEY", "")
-
-if not api_key:
-    return [], ["API-Schlüssel fehlt in den Streamlit-Secrets."]
-
-response = requests.get(
-    API,
-    params=params,
-    headers={
-        "User-Agent": "Holzpellets-Radar/2.0",
-        "Authorization": f"Bearer {api_key}"
-    },
-    timeout=45
-)
-,
-    timeout=45
-)
-            )
-
-            if response.status_code == 429:
-                wait = int(
-                    response.headers.get("Retry-After", "30")
-                )
-
-                if attempt == 2 or wait > 120:
-                    return [], [
-                        f"Rate-Limit: Bitte später erneut versuchen. "
-                        f"Wartezeit: {wait} Sekunden."
-                    ]
-
-                time.sleep(max(wait, 5))
-                continue
-
-            response.raise_for_status()
-            data = response.json()
-
-            results = []
-
-            for item in data.get("results", []):
-                title = (
-                    item.get("title")
-                    or item.get("original_title")
-                    or ""
-                )
-
-                search_text = (
-                    title + " " +
-                    str(item.get("original_title") or "") + " " +
-                    str(item.get("gewerk") or "")
-                ).lower()
-
-                if "pellet" not in search_text:
-                    continue
-
-                buyer = item.get("buyer") or {}
-                place = item.get("place") or {}
-                deadline = item.get("deadline") or {}
-
-                results.append({
-                    "id": item.get("id", ""),
-                    "state": state,
-                    "title": title,
-                    "buyer": (
-                        buyer.get("name", "")
-                        if isinstance(buyer, dict)
-                        else str(buyer)
-                    ),
-                    "place": (
-                        place.get("text")
-                        or place.get("city")
-                        or place.get("land")
-                        or state
-                    ),
-                    "deadline": (
-                        deadline.get("label", "")
-                        if isinstance(deadline, dict)
-                        else str(deadline)
-                    ),
-                    "published": item.get("published_on") or "",
-                    "url": item.get("url") or "",
-                    "source": "Vergabeweiser"
-                })
-
-            return results, []
-
-        except Exception as error:
-            if attempt == 2:
-                return [], [str(error)]
-
-            time.sleep(5 * (attempt + 1))
-
-    return [], ["Suche nicht abgeschlossen."]
-
-
-def run_search():
-    results = []
-    errors = []
+def run_search(api_key):
+    all_results = []
+    all_errors = []
 
     progress = st.progress(0)
 
@@ -258,28 +127,43 @@ def run_search():
     ):
         st.write("Durchsuche:", state)
 
-        found, failed = search_state(state, slug)
+        found, errors = search_state(
+            state, slug, api_key
+        )
 
-        results.extend(found)
-        errors.extend([
-            state + ": " + error for error in failed
-        ])
+        all_results.extend(found)
+
+        for error in errors:
+            all_errors.append(state + ": " + error)
 
         progress.progress(i / len(STATES))
-        time.sleep(5)
+
+        # Kurze Pause zwischen den Anfragen
+        time.sleep(3)
 
     unique = {}
 
-    for item in results:
-        key = item.get("id") or item.get("url") or item.get("title")
+    for item in all_results:
+        key = (
+            item.get("id")
+            or item.get("url")
+            or item.get("title")
+        )
         unique[str(key)] = item
+
+    results = list(unique.values())
+
+    results.sort(
+        key=lambda x: x.get("published") or "",
+        reverse=True
+    )
 
     snapshot = {
         "updated_at": datetime.now(
             ZoneInfo("Europe/Berlin")
         ).isoformat(timespec="seconds"),
-        "results": list(unique.values()),
-        "errors": errors
+        "results": results,
+        "errors": all_errors
     }
 
     DATA_FILE.parent.mkdir(exist_ok=True)
@@ -293,19 +177,40 @@ def run_search():
         encoding="utf-8"
     )
 
+    progress.empty()
+
     return snapshot
 
 
-data = load_data()
+# Hauptseite
 
 st.title("🌲 Holzpellets-Ausschreibungsradar")
+
 st.caption(
     "Tägliche Suche in den fünf neuen Bundesländern"
 )
 
-if st.sidebar.button("🔄 Jetzt suchen", type="primary"):
-    with st.spinner("Suche läuft. Bitte etwas Geduld ..."):
-        data = run_search()
+data = load_data()
+
+api_key = st.secrets.get(
+    "VERGABEWEISER_API_KEY", ""
+)
+
+if not api_key:
+    st.error(
+        "API-Schlüssel fehlt. Bitte Streamlit-Secrets prüfen."
+    )
+    st.stop()
+
+
+if st.sidebar.button(
+    "🔄 Jetzt suchen",
+    type="primary"
+):
+    with st.spinner(
+        "Suche läuft. Bitte etwas Geduld ..."
+    ):
+        data = run_search(api_key)
 
     st.rerun()
 
@@ -324,11 +229,13 @@ results = data.get("results", [])
 
 if errors:
     st.error(
-        "Die Suche war teilweise oder vollständig "
-        "nicht erfolgreich. Bitte die Hinweise prüfen."
+        "Die Suche war nicht vollständig erfolgreich."
     )
 
-    with st.expander("Suchfehler anzeigen", expanded=True):
+    with st.expander(
+        "Suchfehler anzeigen",
+        expanded=True
+    ):
         for error in errors:
             st.write("• " + error)
 
@@ -368,37 +275,34 @@ for state in STATES:
 
         for item in state_results:
             st.markdown(
-                "### " + (
-                    item.get("title")
-                    or "Holzpellet-Ausschreibung"
-                )
+                "### " + item["title"]
             )
 
-            if item.get("buyer"):
+            if item["buyer"]:
                 st.write(
                     "Auftraggeber:",
                     item["buyer"]
                 )
 
-            if item.get("place"):
+            if item["place"]:
                 st.write(
                     "Ort:",
                     item["place"]
                 )
 
-            if item.get("deadline"):
+            if item["deadline"]:
                 st.write(
                     "Angebotsfrist:",
                     item["deadline"]
                 )
 
-            if item.get("published"):
+            if item["published"]:
                 st.write(
                     "Veröffentlicht:",
                     item["published"]
                 )
 
-            if item.get("url"):
+            if item["url"]:
                 st.markdown(
                     f"[Zur Originalausschreibung ↗]({item['url']})"
                 )
@@ -418,5 +322,5 @@ st.caption(
 )
 
 st.markdown(
-    "[Datenquelle und API-Hinweise](https://vergabeweiser.de/api)"
+    "[Vergabeweiser – API und Datenquelle](https://vergabeweiser.de/api)"
 )
