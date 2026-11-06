@@ -16,6 +16,12 @@ STATES = {
     "Thüringen": "thueringen"
 }
 
+SEARCH_TERMS = [
+    "Holzpellets",
+    "Pelletlieferung",
+    "Pellets"
+]
+
 API = "https://vergabeweiser.de/api/v1/tenders"
 DATA_FILE = Path("data/latest.json")
 
@@ -34,92 +40,135 @@ headers = {
 all_results = []
 all_errors = []
 
+
+def get_value(value, *keys):
+    if isinstance(value, dict):
+        for key in keys:
+            if value.get(key):
+                return value[key]
+    elif value:
+        return str(value)
+    return ""
+
+
 for state, slug in STATES.items():
-    print("Durchsuche:", state)
 
-    try:
-        response = requests.get(
-            API,
-            params={
-                "was": "Holzpellets",
-                "land": slug,
-                "status": "offen",
-                "sort": "neu",
-                "seite": 1
-            },
-            headers=headers,
-            timeout=45
-        )
+    for term in SEARCH_TERMS:
 
-        if response.status_code == 429:
-            wait = response.headers.get(
-                "Retry-After", "unbekannt"
+        print(f"Suche: {state} – {term}")
+
+        try:
+            response = requests.get(
+                API,
+                params={
+                    "was": term,
+                    "land": slug,
+                    "status": "offen",
+                    "sort": "neu",
+                    "seite": 1
+                },
+                headers=headers,
+                timeout=45
             )
+
+            if response.status_code == 429:
+                all_errors.append(
+                    f"{state} / {term}: API-Limit erreicht."
+                )
+                continue
+
+            response.raise_for_status()
+            data = response.json()
+
+            print("Suchverständnis:", data.get("understood"))
+            print("Gesamtzahl laut API:", data.get("total"))
+
+            for item in data.get("results", []):
+
+                title = (
+                    item.get("title")
+                    or item.get("original_title")
+                    or "Pellet-Ausschreibung"
+                )
+
+                original = item.get("original_title") or ""
+                description = item.get("description") or ""
+
+                search_text = (
+                    title + " " + original + " " + description
+                ).lower()
+
+                if "pellet" not in search_text:
+                    continue
+
+                woodpellet_terms = [
+                    "holzpellet",
+                    "holz pellet",
+                    "holzpellets"
+                ]
+
+                clearly_wood = any(
+                    word in search_text
+                    for word in woodpellet_terms
+                )
+
+                all_results.append({
+                    "id": item.get("id", ""),
+                    "state": state,
+                    "title": title,
+                    "buyer": get_value(
+                        item.get("buyer"), "name"
+                    ),
+                    "place": get_value(
+                        item.get("place"), "text", "city"
+                    ) or state,
+                    "deadline": get_value(
+                        item.get("deadline"), "label"
+                    ),
+                    "published": item.get("published_on") or "",
+                    "url": item.get("url") or "",
+                    "search_term": term,
+                    "woodpellet_check": (
+                        "Holzpellet-Bezug erkannt"
+                        if clearly_wood
+                        else "Holzpellet-Bezug bitte prüfen"
+                    ),
+                    "source": "Vergabeweiser"
+                })
+
+        except Exception as error:
             all_errors.append(
-                f"{state}: API-Limit erreicht. "
-                f"Retry-After: {wait}"
-            )
-            print("API-Limit erreicht:", state)
-            continue
-
-        response.raise_for_status()
-        data = response.json()
-       
-        print("Suchverständnis:", data.get("understood"))
-        print("Gesamtzahl laut API:", data.get("total"))
-        print("Such-URL:", data.get("search_url"))
-        
-        for item in data.get("results", []):
-            title = (
-                item.get("title")
-                or item.get("original_title")
-                or "Holzpellet-Ausschreibung"
+                f"{state} / {term}: {str(error)}"
             )
 
-            all_results.append({
-                "id": item.get("id", ""),
-                "state": state,
-                "title": title,
-                "buyer": (
-                    (item.get("buyer") or {}).get("name", "")
-                ),
-                "place": (
-                    (item.get("place") or {}).get("text")
-                    or (item.get("place") or {}).get("city")
-                    or state
-                ),
-                "deadline": (
-                    (item.get("deadline") or {}).get("label", "")
-                ),
-                "published": item.get("published_on") or "",
-                "url": item.get("url") or "",
-                "source": "Vergabeweiser"
-            })
+            print("Fehler:", state, term, error)
 
-        print(
-            state,
-            "- Treffer:",
-            len(data.get("results", []))
-        )
+        # Anfragen zeitlich entzerren
+        time.sleep(2)
 
-    except Exception as error:
-        all_errors.append(
-            f"{state}: {str(error)}"
-        )
-        print("Fehler:", state, error)
-
-    time.sleep(3)
 
 # Doppelte Ausschreibungen entfernen
 unique = {}
 
 for item in all_results:
+
     key = (
-        item.get("id")
-        or item.get("url")
-        or item.get("title")
+        str(item.get("id"))
+        if item.get("id")
+        else item.get("url") or (
+            item.get("state", "") + item.get("title", "")
+        )
     )
-    unique[str(key)] = item
+
+    if key not in unique:
+        unique[key] = item
+
+    elif (
+        item["woodpellet_check"] == "Holzpellet-Bezug erkannt"
+    ):
+        unique[key]["woodpellet_check"] = (
+            "Holzpellet-Bezug erkannt"
+        )
 
 results = list(unique.values())
 
@@ -152,10 +201,15 @@ DATA_FILE.write_text(
 )
 
 print("--------------------------------")
-print("Holzpellets-Radar abgeschlossen")
-print("Treffer:", len(results))
+print("HOLZPELLETS-RADAR ABGESCHLOSSEN")
+print("Suchbegriffe:", len(SEARCH_TERMS))
+print("Bundesländer:", len(STATES))
+print("Suchanfragen:", len(STATES) * len(SEARCH_TERMS))
+print("Gefundene Treffer:", len(results))
+print("Davon mit erkanntem Holzpellet-Bezug:",
+      sum(
+          1 for x in results
+          if x["woodpellet_check"] == "Holzpellet-Bezug erkannt"
+      ))
 print("Fehler:", len(all_errors))
 print("--------------------------------")
-
-if all_errors:
-    print("WARNUNG: Suche teilweise unvollständig.")
