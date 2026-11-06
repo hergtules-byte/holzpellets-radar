@@ -4,7 +4,6 @@ name: Tägliches Holzpellets-Radar
 on:
   schedule:
     - cron: "15 5 * * *"
-
   workflow_dispatch:
 
 permissions:
@@ -24,7 +23,7 @@ jobs:
       - name: Python installieren
         run: pip install requests
 
-            - name: Ausschreibungen suchen
+      - name: Ausschreibungen suchen
         env:
           VERGABEWEISER_API_KEY: ${{ secrets.VERGABEWEISER_API_KEY }}
         run: python update_data.py
