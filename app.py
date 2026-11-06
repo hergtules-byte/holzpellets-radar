@@ -1,10 +1,12 @@
 
 import json
 from pathlib import Path
+from datetime import datetime
+
 import streamlit as st
 
 # =====================================
-# SEITENEINSTELLUNGEN
+# SEITENKONFIGURATION
 # =====================================
 
 st.set_page_config(
@@ -23,6 +25,13 @@ STATES = [
 
 DATA_FILE = Path("data/latest.json")
 
+CATEGORIES = [
+    "Holzpellet-Ausschreibungen",
+    "Pellet-Projekte",
+    "Holzhackschnitzel",
+    "Weitere Holzbrennstoffe",
+    "Weitere Prüftreffer"
+]
 
 # =====================================
 # DATEN LADEN
@@ -33,7 +42,8 @@ def load_data():
         return {
             "updated_at": None,
             "results": [],
-            "errors": []
+            "errors": [],
+            "statistics": {}
         }
 
     try:
@@ -45,144 +55,84 @@ def load_data():
         return {
             "updated_at": None,
             "results": [],
-            "errors": ["Datendatei konnte nicht gelesen werden."]
+            "errors": [],
+            "statistics": {}
         }
 
 
 # =====================================
-# KATEGORIEN ZUORDNEN
+# TREFFER EINORDNEN
 # =====================================
 
-def get_category(item):
-
-    check = (
-        item.get("woodpellet_check") or ""
+def classify_result(item):
+    label = str(
+        item.get("woodpellet_check", "")
     ).lower()
 
-    title = (
-        item.get("title") or ""
-    ).lower()
+    title = str(item.get("title", ""))
+    description = str(item.get("description", ""))
+    text = (title + " " + description).lower()
 
-    description = (
-        item.get("description") or ""
-    ).lower()
+    # Hackschnitzel separat behandeln
+    if "hackschnitzel" in label:
+        return "Holzhackschnitzel"
 
-    text = title + " " + description
+    # Projekte anhand des Ausschreibungsinhalts erkennen
+    project_terms = [
+        "umstellung",
+        "pelletfeuerung",
+        "pelletheizung",
+        "biomassekessel",
+        "kesselanlage",
+        "heizungsanlage",
+        "wärmeerzeugung",
+        "errichtung",
+        "installation",
+        "montage",
+        "neubau",
+        "sanierung"
+    ]
 
-    if "holzpellets eindeutig" in check:
-        return "Holzpellet-Ausschreibungen"
-
-    if "pellets – holzart prüfen" in check:
-        return "Pellet-Projekte"
-
-    if "pellets - holzart prüfen" in check:
-        return "Pellet-Projekte"
-
-    if "pellet" in check:
-        return "Pellet-Projekte"
-
-    if (
-        "hackschnitzel" in check
-        or "holzbrennstoff" in check
-        or "holzbrikett" in check
-        or "cpv 09111400" in check
-    ):
-        return "Weitere Holzbrennstoffe"
-
-    if "holzpellet" in text:
-        return "Holzpellet-Ausschreibungen"
-
-    if "pellet" in text:
-        return "Pellet-Projekte"
-
-    if (
-        "hackschnitzel" in text
-        or "holzbrikett" in text
-        or "holzbrennstoff" in text
-    ):
-        return "Weitere Holzbrennstoffe"
-
-    return "Weitere Holzbrennstoffe"
-
-
-# =====================================
-# EINZELNE AUSSCHREIBUNG ANZEIGEN
-# =====================================
-
-def show_tender(item):
-
-    st.markdown(
-        "#### " + (
-            item.get("title")
-            or "Ausschreibung ohne Titel"
-        )
+    is_project = any(
+        term in text for term in project_terms
     )
 
-    col1, col2 = st.columns(2)
+    if is_project and (
+        "pellet" in text or "biomasse" in text
+    ):
+        return "Pellet-Projekte"
 
-    with col1:
-        st.write(
-            "**Auftraggeber:**",
-            item.get("buyer") or "Nicht angegeben"
-        )
+    if "holzpellets eindeutig" in label:
+        return "Holzpellet-Ausschreibungen"
 
-        st.write(
-            "**Ort:**",
-            item.get("place") or "Nicht angegeben"
-        )
+    if "pellets" in label:
+        return "Pellet-Projekte"
 
-    with col2:
-        st.write(
-            "**Angebotsfrist:**",
-            item.get("deadline") or "Nicht angegeben"
-        )
+    if (
+        "holzbrennstoff" in label
+        or "cpv" in label
+        or "sonstiger" in label
+    ):
+        return "Weitere Holzbrennstoffe"
 
-        st.write(
-            "**Veröffentlicht:**",
-            item.get("published") or "Nicht angegeben"
-        )
-
-    if item.get("description"):
-        with st.expander("Beschreibung anzeigen"):
-            st.write(item["description"])
-
-    if item.get("cpv"):
-        st.caption("CPV: " + str(item["cpv"]))
-
-    if item.get("woodpellet_check"):
-        st.caption(
-            "Einstufung: "
-            + item["woodpellet_check"]
-        )
-
-    links = []
-
-    for key, label in [
-        ("url", "Originalausschreibung"),
-        ("notice_url", "Bekanntmachung"),
-        ("documents_url", "Vergabeunterlagen")
-    ]:
-        url = item.get(key)
-
-        if (
-            isinstance(url, str)
-            and url.startswith("https://")
-            and url not in [x[1] for x in links]
-        ):
-            links.append((label, url))
-
-    if links:
-        for label, url in links:
-            st.markdown(
-                f"[{label} öffnen ↗]({url})"
-            )
-
-    st.caption("Quelle: Vergabeweiser")
-    st.divider()
+    return "Weitere Prüftreffer"
 
 
 # =====================================
-# HAUPTSEITE
+# DATEN VORBEREITEN
+# =====================================
+
+data = load_data()
+
+results = data.get("results", [])
+errors = data.get("errors", [])
+statistics = data.get("statistics", {})
+
+for item in results:
+    item["display_category"] = classify_result(item)
+
+# =====================================
+# KOPFBEREICH
 # =====================================
 
 st.title("🌲 Holzpellets-Ausschreibungsradar")
@@ -192,140 +142,237 @@ st.caption(
     "in den fünf neuen Bundesländern"
 )
 
-data = load_data()
-
-results = data.get("results", [])
-errors = data.get("errors", [])
-
 if data.get("updated_at"):
     st.caption(
         "Letzte Aktualisierung: "
         + str(data["updated_at"])
     )
-else:
-    st.info(
-        "Noch keine Suchdaten vorhanden."
-    )
+
+st.divider()
 
 # =====================================
-# FEHLERHINWEISE
+# GESAMTÜBERSICHT
 # =====================================
 
-if errors:
-    st.warning(
-        "Die Suche war teilweise oder vollständig "
-        "nicht erfolgreich. Bitte Hinweise prüfen."
-    )
+st.header("Gesamtübersicht")
 
-    with st.expander("Suchfehler anzeigen"):
-        for error in errors:
-            st.write("• " + str(error))
+pellet_count = sum(
+    1 for x in results
+    if x["display_category"]
+    == "Holzpellet-Ausschreibungen"
+)
 
+project_count = sum(
+    1 for x in results
+    if x["display_category"] == "Pellet-Projekte"
+)
 
-# =====================================
-# ERGEBNISSE EINORDNEN
-# =====================================
+chip_count = sum(
+    1 for x in results
+    if x["display_category"] == "Holzhackschnitzel"
+)
 
-categories = {
-    "Holzpellet-Ausschreibungen": [],
-    "Pellet-Projekte": [],
-    "Weitere Holzbrennstoffe": []
-}
-
-for item in results:
-    category = get_category(item)
-    categories[category].append(item)
-
-
-# =====================================
-# ÜBERSICHT
-# =====================================
-
-st.subheader("Gesamtübersicht")
+other_count = sum(
+    1 for x in results
+    if x["display_category"] == "Weitere Holzbrennstoffe"
+)
 
 col1, col2, col3, col4 = st.columns(4)
 
-with col1:
-    st.metric(
-        "Alle Treffer",
-        len(results)
-    )
+col1.metric("Alle Treffer", len(results))
+col2.metric("Holzpellet-Ausschreibungen", pellet_count)
+col3.metric("Pellet-Projekte", project_count)
+col4.metric(
+    "Weitere Holzbrennstoffe",
+    chip_count + other_count
+)
 
-with col2:
-    st.metric(
-        "Holzpellet-Ausschreibungen",
-        len(categories["Holzpellet-Ausschreibungen"])
-    )
-
-with col3:
-    st.metric(
-        "Pellet-Projekte",
-        len(categories["Pellet-Projekte"])
-    )
-
-with col4:
-    st.metric(
-        "Weitere Holzbrennstoffe",
-        len(categories["Weitere Holzbrennstoffe"])
-    )
-
+st.divider()
 
 # =====================================
-# BUNDESLÄNDER
+# FILTER
 # =====================================
 
-st.subheader("Ausschreibungen nach Bundesland")
+st.header("Ausschreibungen und Projekte")
+
+filter_col1, filter_col2 = st.columns(2)
+
+with filter_col1:
+    selected_state = st.selectbox(
+        "Bundesland",
+        ["Alle Bundesländer"] + STATES
+    )
+
+with filter_col2:
+    selected_category = st.selectbox(
+        "Kategorie",
+        ["Alle Kategorien"] + CATEGORIES
+    )
+
+filtered = results
+
+if selected_state != "Alle Bundesländer":
+    filtered = [
+        x for x in filtered
+        if x.get("state") == selected_state
+    ]
+
+if selected_category != "Alle Kategorien":
+    filtered = [
+        x for x in filtered
+        if x["display_category"] == selected_category
+    ]
+
+st.write(
+    f"**{len(filtered)} Treffer gefunden**"
+)
+
+# =====================================
+# ERGEBNISSE ANZEIGEN
+# =====================================
 
 for state in STATES:
 
+    if (
+        selected_state != "Alle Bundesländer"
+        and selected_state != state
+    ):
+        continue
+
     state_results = [
-        item for item in results
-        if item.get("state") == state
+        x for x in filtered
+        if x.get("state") == state
     ]
 
     with st.container(border=True):
 
-        st.header(state)
+        st.subheader(state)
 
-        st.write(
+        st.caption(
             f"Gefundene Treffer: {len(state_results)}"
         )
 
-        for category_name in [
-            "Holzpellet-Ausschreibungen",
-            "Pellet-Projekte",
-            "Weitere Holzbrennstoffe"
-        ]:
+        if not state_results:
+            st.info(
+                "Keine passenden Treffer in dieser Auswahl."
+            )
+            continue
+
+        for category in CATEGORIES:
 
             category_results = [
-                item for item in state_results
-                if get_category(item) == category_name
+                x for x in state_results
+                if x["display_category"] == category
             ]
 
+            if not category_results:
+                continue
+
             with st.expander(
-                f"{category_name} ({len(category_results)})",
-                expanded=bool(category_results)
+                f"{category} ({len(category_results)})",
+                expanded=True
             ):
 
-                if category_results:
-                    for item in category_results:
-                        show_tender(item)
+                for item in category_results:
 
-                else:
-                    if errors:
-                        st.warning(
-                            "Keine bestätigten Treffer. "
-                            "Die Suche war möglicherweise unvollständig."
+                    st.markdown(
+                        "### " + str(
+                            item.get("title")
+                            or "Ausschreibung ohne Titel"
                         )
-                    elif data.get("updated_at"):
-                        st.success(
-                            "Keine passenden Ausschreibungen gefunden."
-                        )
-                    else:
-                        st.info(
-                            "Noch keine Suche durchgeführt."
+                    )
+
+                    st.caption(
+                        "Einordnung: " + category
+                    )
+
+                    if item.get("buyer"):
+                        st.write(
+                            "**Auftraggeber:**",
+                            item["buyer"]
                         )
 
+                    if item.get("place"):
+                        st.write(
+                            "**Standort:**",
+                            item["place"]
+                        )
+
+                    if item.get("published"):
+                        st.write(
+                            "**Veröffentlicht:**",
+                            item["published"]
+                        )
+
+                    if item.get("deadline"):
+                        st.write(
+                            "**Angebotsfrist:**",
+                            item["deadline"]
+                        )
+
+                    if item.get("estimated_value"):
+                        st.write(
+                            "**Geschätzter Auftragswert:**",
+                            item["estimated_value"]
+                        )
+
+                    if item.get("description"):
+                        st.write(
+                            "**Beschreibung:**",
+                            item["description"]
+                        )
+
+                    if item.get("cpv"):
+                        st.caption(
+                            "CPV: " + str(item["cpv"])
+                        )
+
+                    if item.get("url"):
+                        st.markdown(
+                            f"[Originalausschreibung öffnen ↗]"
+                            f"({item['url']})"
+                        )
+
+                    if item.get("documents_url"):
+                        st.markdown(
+                            f"[Vergabeunterlagen öffnen ↗]"
+                            f"({item['documents_url']})"
+                        )
+
+                    if item.get("notice_url"):
+                        st.markdown(
+                            f"[Originalbekanntmachung öffnen ↗]"
+                            f"({item['notice_url']})"
+                        )
+
+                    st.divider()
+
+# =====================================
+# SUCHSTATISTIK
+# =====================================
+
+with st.expander("Suchstatistik und technische Details"):
+
+    if statistics:
+        st.json(statistics)
+
+    if data.get("search_stats"):
+        st.write("Einzelne Suchabfragen")
+        st.dataframe(
+            data["search_stats"],
+            use_container_width=True
+        )
+
+    if errors:
+        st.error("Fehler bei der Suche")
+
+        for error in errors:
+            st.write("• " + str(error))
+
+    else:
+        st.success(
+            "Keine Suchfehler im letzten gespeicherten Lauf."
+        )
 
 # =====================================
 # ABSCHLUSS
@@ -334,13 +381,11 @@ for state in STATES:
 st.divider()
 
 st.caption(
-    "Bitte Angebotsfristen und Vergabeunterlagen "
-    "immer in der Originalbekanntmachung prüfen. "
-    "Die Suche kann keine vollständige Erfassung "
-    "aller Ausschreibungen garantieren."
+    "Holzpellets-Ausschreibungsradar | "
+    "Datenquelle: Vergabeweiser"
 )
 
-st.markdown(
-    "[Vergabeweiser – API und Datenquelle]"
-    "(https://vergabeweiser.de/api)"
+st.caption(
+    "Bitte Angebotsfristen und Vergabeunterlagen "
+    "immer in der Originalbekanntmachung prüfen."
 )
