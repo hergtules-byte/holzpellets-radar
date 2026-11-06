@@ -58,6 +58,12 @@ def search_state(state, slug):
 if not api_key:
     return [], ["API-Schlüssel fehlt in den Streamlit-Secrets."]
 
+
+api_key = st.secrets.get("VERGABEWEISER_API_KEY", "")
+
+if not api_key:
+    return [], ["API-Schlüssel fehlt in den Streamlit-Secrets."]
+
 response = requests.get(
     API,
     params=params,
@@ -65,6 +71,9 @@ response = requests.get(
         "User-Agent": "Holzpellets-Radar/2.0",
         "Authorization": f"Bearer {api_key}"
     },
+    timeout=45
+)
+,
     timeout=45
 )
             )
