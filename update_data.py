@@ -64,7 +64,9 @@ for state, slug in STATES.items():
 
         response.raise_for_status()
         data = response.json()
-
+print("Suchverständnis:", data.get("understood"))
+print("Gesamtzahl laut API:", data.get("total"))
+print("Such-URL:", data.get("search_url"))
         for item in data.get("results", []):
             title = (
                 item.get("title")
