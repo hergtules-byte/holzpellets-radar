@@ -1,5 +1,123 @@
 {
-  "updated_at": "2026-11-06T16:16:31+01:00",
+  "updated_at": "2026-11-06T16:22:10+01:00",
   "results": [],
-  "errors": []
+  "errors": [],
+  "search_stats": [
+    {
+      "state": "Brandenburg",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Pellets",
+      "page": 1,
+      "total": 4,
+      "received": 4
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Pellets",
+      "page": 1,
+      "total": 10,
+      "received": 10
+    },
+    {
+      "state": "Sachsen",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Pellets",
+      "page": 1,
+      "total": 3,
+      "received": 3
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Pellets",
+      "page": 1,
+      "total": 2,
+      "received": 2
+    },
+    {
+      "state": "Thüringen",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Pellets",
+      "page": 1,
+      "total": 5,
+      "received": 5
+    }
+  ],
+  "statistics": {
+    "states": 5,
+    "search_terms": 3,
+    "search_requests": 15,
+    "candidates": 24,
+    "detail_requests": 24,
+    "detail_errors": 0,
+    "total_results": 0,
+    "confirmed_woodpellets": 0,
+    "manual_review": 0
+  }
 }
