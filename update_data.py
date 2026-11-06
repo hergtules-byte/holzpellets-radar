@@ -1,6 +1,7 @@
 
 import json
 import time
+import os
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -26,9 +27,10 @@ def search_state(state, slug):
         "seite": 1
     }
 
-    headers = {
-        "User-Agent": "Holzpellets-Radar/2.0"
-    }
+   headers = {
+    "User-Agent": "Holzpellets-Radar/2.0",
+    "Authorization": f"Bearer {os.environ['VERGABEWEISER_API_KEY']}"
+}
 
     for attempt in range(3):
         try:
