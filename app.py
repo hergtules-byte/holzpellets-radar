@@ -42,13 +42,107 @@ def load_data():
     }
 
 
+
 def search_state(state, slug):
+    api_key = st.secrets.get("VERGABEWEISER_API_KEY", "")
+
+    if not api_key:
+        return [], ["API-Schlüssel fehlt in den Streamlit-Secrets."]
+
     params = {
         "was": "Holzpellets",
         "land": slug,
         "status": "offen",
         "sort": "neu",
         "seite": 1
+    }
+
+    headers = {
+        "User-Agent": "Holzpellets-Radar/2.0",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    for attempt in range(3):
+        try:
+            response = requests.get(
+                API,
+                params=params,
+                headers=headers,
+                timeout=45
+            )
+
+            if response.status_code == 429:
+                wait = int(
+                    response.headers.get("Retry-After", "60")
+                )
+
+                if attempt == 2 or wait > 120:
+                    return [], [
+                        "Rate-Limit erreicht. Bitte später erneut versuchen."
+                    ]
+
+                time.sleep(max(wait, 5))
+                continue
+
+            response.raise_for_status()
+            data = response.json()
+
+            results = []
+
+            for item in data.get("results", []):
+                title = (
+                    item.get("title")
+                    or item.get("original_title")
+                    or ""
+                )
+
+                search_text = (
+                    title + " " +
+                    str(item.get("original_title") or "") + " " +
+                    str(item.get("gewerk") or "")
+                ).lower()
+
+                if "pellet" not in search_text:
+                    continue
+
+                buyer = item.get("buyer") or {}
+                place = item.get("place") or {}
+                deadline = item.get("deadline") or {}
+
+                results.append({
+                    "id": item.get("id", ""),
+                    "state": state,
+                    "title": title,
+                    "buyer": (
+                        buyer.get("name", "")
+                        if isinstance(buyer, dict)
+                        else str(buyer)
+                    ),
+                    "place": (
+                        place.get("text")
+                        or place.get("city")
+                        or state
+                    ),
+                    "deadline": (
+                        deadline.get("label", "")
+                        if isinstance(deadline, dict)
+                        else str(deadline)
+                    ),
+                    "published": item.get("published_on") or "",
+                    "url": item.get("url") or "",
+                    "source": "Vergabeweiser"
+                })
+
+            return results, []
+
+        except Exception as error:
+            if attempt == 2:
+                return [], [str(error)]
+
+            time.sleep(5 * (attempt + 1))
+
+    return [], ["Suche nicht abgeschlossen."]
+
     }
 
     for attempt in range(3):
