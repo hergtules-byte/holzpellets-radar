@@ -53,13 +53,20 @@ def search_state(state, slug):
 
     for attempt in range(3):
         try:
-            response = requests.get(
-                API,
-                params=params,
-                headers={
-                    "User-Agent": "Holzpellets-Radar/2.0"
-                },
-                timeout=45
+            api_key = st.secrets.get("VERGABEWEISER_API_KEY", "")
+
+if not api_key:
+    return [], ["API-Schlüssel fehlt in den Streamlit-Secrets."]
+
+response = requests.get(
+    API,
+    params=params,
+    headers={
+        "User-Agent": "Holzpellets-Radar/2.0",
+        "Authorization": f"Bearer {api_key}"
+    },
+    timeout=45
+)
             )
 
             if response.status_code == 429:
