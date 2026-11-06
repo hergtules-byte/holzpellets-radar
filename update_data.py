@@ -1,5 +1,6 @@
 
 import os
+import re
 import json
 import time
 from pathlib import Path
@@ -7,6 +8,14 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import requests
+
+
+# ---------------------------------------
+# KONFIGURATION
+# ---------------------------------------
+
+API = "https://vergabeweiser.de/api/v1"
+DATA_FILE = Path("data/latest.json")
 
 STATES = {
     "Brandenburg": "brandenburg",
@@ -22,8 +31,9 @@ SEARCH_TERMS = [
     "Pellets"
 ]
 
-API = "https://vergabeweiser.de/api/v1/tenders"
-DATA_FILE = Path("data/latest.json")
+MAX_PAGES = 2
+MAX_DETAIL_REQUESTS = 500
+PAUSE = 0.25
 
 api_key = os.environ.get("VERGABEWEISER_API_KEY")
 
@@ -32,14 +42,22 @@ if not api_key:
         "GitHub Secret VERGABEWEISER_API_KEY fehlt."
     )
 
-headers = {
+session = requests.Session()
+
+session.headers.update({
     "Authorization": f"Bearer {api_key}",
-    "User-Agent": "Holzpellets-Radar/2.0"
-}
+    "User-Agent": "Holzpellets-Radar/3.0",
+    "Accept": "application/json"
+})
 
-all_results = []
-all_errors = []
+errors = []
+candidates = {}
+search_stats = []
 
+
+# ---------------------------------------
+# HILFSFUNKTIONEN
+# ---------------------------------------
 
 def get_value(value, *keys):
     if isinstance(value, dict):
@@ -48,8 +66,126 @@ def get_value(value, *keys):
                 return value[key]
     elif value:
         return str(value)
+
     return ""
 
+
+def flatten_text(value):
+    """Sammelt Text aus verschachtelten API-Daten."""
+
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, dict):
+        return " ".join(
+            flatten_text(v)
+            for v in value.values()
+        )
+
+    if isinstance(value, list):
+        return " ".join(
+            flatten_text(v)
+            for v in value
+        )
+
+    return ""
+
+
+def get_json(url, params=None):
+    response = session.get(
+        url,
+        params=params,
+        timeout=45
+    )
+
+    response.raise_for_status()
+
+    return response.json()
+
+
+def identify_pellets(text):
+    text = text.lower()
+
+    # Holzpellets eindeutig erwähnt
+    wood_patterns = [
+        r"holz[\s-]*pellet",
+        r"pellet[\s-]*holz",
+        r"pellets?\s+aus\s+holz",
+        r"wood[\s-]*pellet"
+    ]
+
+    if any(
+        re.search(pattern, text)
+        for pattern in wood_patterns
+    ):
+        return "Holzpellets eindeutig erkannt"
+
+    # Allgemeine Pellet-Bezüge zur manuellen Prüfung
+    if "pellet" in text:
+        return "Pellet-Bezug – Holzart prüfen"
+
+    return None
+
+
+def extract_result(item, detail, state, term):
+
+    # Detaildaten haben Vorrang
+    merged = dict(item)
+    merged.update(detail)
+
+    title = (
+        merged.get("title")
+        or merged.get("original_title")
+        or "Pellet-Ausschreibung"
+    )
+
+    original = merged.get("original_title") or ""
+
+    # Alle verfügbaren Textfelder einschließlich
+    # Beschreibung und Losinformationen untersuchen
+    complete_text = flatten_text(merged)
+
+    classification = identify_pellets(complete_text)
+
+    if not classification:
+        return None
+
+    buyer = merged.get("buyer") or {}
+    place = merged.get("place") or {}
+    deadline = merged.get("deadline") or {}
+
+    return {
+        "id": merged.get("id", ""),
+        "state": state,
+        "title": title,
+        "original_title": original,
+        "buyer": get_value(buyer, "name"),
+        "place": (
+            get_value(place, "text", "city")
+            or state
+        ),
+        "deadline": get_value(deadline, "label"),
+        "published": merged.get("published_on") or "",
+        "url": merged.get("url") or "",
+        "documents_url": merged.get("documents_url") or "",
+        "notice_url": merged.get("notice_url") or "",
+        "description": merged.get("description") or "",
+        "cpv": merged.get("cpv") or "",
+        "gewerk": merged.get("gewerk") or "",
+        "estimated_value": merged.get("estimated_value"),
+        "search_term": term,
+        "woodpellet_check": classification,
+        "source": "Vergabeweiser"
+    }
+
+
+# ---------------------------------------
+# 1. SUCHEN
+# ---------------------------------------
+
+print("HOLZPELLETS-RADAR 3.0")
+print("Starte die Suche in fünf Bundesländern.")
+print("--------------------------------")
 
 for state, slug in STATES.items():
 
@@ -57,107 +193,159 @@ for state, slug in STATES.items():
 
         print(f"Suche: {state} – {term}")
 
-        try:
-            response = requests.get(
-                API,
-                params={
-                    "was": term,
-                    "land": slug,
-                    "status": "offen",
-                    "sort": "neu",
-                    "seite": 1
-                },
-                headers=headers,
-                timeout=45
-            )
+        for page in range(1, MAX_PAGES + 1):
 
-            if response.status_code == 429:
-                all_errors.append(
-                    f"{state} / {term}: API-Limit erreicht."
-                )
-                continue
-
-            response.raise_for_status()
-            data = response.json()
-
-            print("Suchverständnis:", data.get("understood"))
-            print("Gesamtzahl laut API:", data.get("total"))
-            print("Beispieltitel:", [r.get("title") or r.get("original_title") for r in data.get("results", [])[:5]])
-
-            for item in data.get("results", []):
-
-                title = (
-                    item.get("title")
-                    or item.get("original_title")
-                    or "Pellet-Ausschreibung"
+            try:
+                data = get_json(
+                    f"{API}/tenders",
+                    params={
+                        "was": term,
+                        "land": slug,
+                        "status": "offen",
+                        "sort": "neu",
+                        "seite": page
+                    }
                 )
 
-                original = item.get("original_title") or ""
-                description = item.get("description") or ""
+                total = data.get("total", 0)
+                results = data.get("results", [])
 
-                search_text = (
-                    title + " " + original + " " + description
-                ).lower()
-
-                if "pellet" not in search_text:
-                    continue
-
-                woodpellet_terms = [
-                    "holzpellet",
-                    "holz pellet",
-                    "holzpellets"
-                ]
-
-                clearly_wood = any(
-                    word in search_text
-                    for word in woodpellet_terms
+                print(
+                    f"{state} / {term} / Seite {page}: "
+                    f"{len(results)} Ergebnisse, "
+                    f"gesamt laut API: {total}"
                 )
 
-                all_results.append({
-                    "id": item.get("id", ""),
+                search_stats.append({
                     "state": state,
-                    "title": title,
-                    "buyer": get_value(
-                        item.get("buyer"), "name"
-                    ),
-                    "place": get_value(
-                        item.get("place"), "text", "city"
-                    ) or state,
-                    "deadline": get_value(
-                        item.get("deadline"), "label"
-                    ),
-                    "published": item.get("published_on") or "",
-                    "url": item.get("url") or "",
-                    "search_term": term,
-                    "woodpellet_check": (
-                        "Holzpellet-Bezug erkannt"
-                        if clearly_wood
-                        else "Holzpellet-Bezug bitte prüfen"
-                    ),
-                    "source": "Vergabeweiser"
+                    "term": term,
+                    "page": page,
+                    "total": total,
+                    "received": len(results)
                 })
 
-        except Exception as error:
-            all_errors.append(
-                f"{state} / {term}: {str(error)}"
+                for item in results:
+
+                    tender_id = item.get("id")
+
+                    if tender_id:
+                        candidates[str(tender_id)] = {
+                            "item": item,
+                            "state": state,
+                            "term": term
+                        }
+
+                    else:
+                        print(
+                            "Hinweis: Ausschreibung ohne ID:",
+                            item.get("title")
+                        )
+
+                # Keine weiteren Seiten erforderlich
+                if page >= min(
+                    data.get("pages", 1),
+                    MAX_PAGES
+                ):
+                    break
+
+                time.sleep(PAUSE)
+
+            except Exception as error:
+                errors.append(
+                    f"Suche {state} / {term} / Seite "
+                    f"{page}: {str(error)}"
+                )
+
+                print("Suchfehler:", error)
+                break
+
+
+# ---------------------------------------
+# 2. DETAILDATEN ABRUFEN
+# ---------------------------------------
+
+print("--------------------------------")
+print("Rufe ausführliche Ausschreibungen ab.")
+
+all_results = []
+
+detail_count = 0
+detail_errors = 0
+
+for tender_id, candidate in candidates.items():
+
+    if detail_count >= MAX_DETAIL_REQUESTS:
+        errors.append(
+            "Maximale Zahl der Detailabrufe erreicht."
+        )
+        break
+
+    item = candidate["item"]
+    state = candidate["state"]
+    term = candidate["term"]
+
+    try:
+        detail = get_json(
+            f"{API}/tenders/{tender_id}"
+        )
+
+        # Falls die API die Daten verschachtelt liefert
+        if isinstance(detail.get("tender"), dict):
+            detail = detail["tender"]
+
+        elif isinstance(detail.get("data"), dict):
+            detail = detail["data"]
+
+        detail_count += 1
+
+        result = extract_result(
+            item,
+            detail,
+            state,
+            term
+        )
+
+        if result:
+            all_results.append(result)
+
+            print(
+                "Treffer:",
+                state,
+                result["woodpellet_check"],
+                result["title"]
             )
 
-            print("Fehler:", state, term, error)
+    except Exception as error:
 
-        # Anfragen zeitlich entzerren
-        time.sleep(2)
+        detail_errors += 1
+
+        errors.append(
+            f"Detail {tender_id}: {str(error)}"
+        )
+
+        print(
+            "Detailfehler:",
+            tender_id,
+            error
+        )
+
+    time.sleep(PAUSE)
 
 
-# Doppelte Ausschreibungen entfernen
+# ---------------------------------------
+# 3. DOPPELTE ENTFERNEN
+# ---------------------------------------
+
 unique = {}
 
 for item in all_results:
 
     key = (
         str(item.get("id"))
-        if item.get("id")
-        else item.get("url") or (
-            item.get("state", "") + item.get("title", "")
+        or item.get("url")
+        or (
+            item.get("state", "")
+            + item.get("title", "")
         )
     )
 
@@ -165,10 +353,11 @@ for item in all_results:
         unique[key] = item
 
     elif (
-        item["woodpellet_check"] == "Holzpellet-Bezug erkannt"
+        item["woodpellet_check"]
+        == "Holzpellets eindeutig erkannt"
     ):
         unique[key]["woodpellet_check"] = (
-            "Holzpellet-Bezug erkannt"
+            "Holzpellets eindeutig erkannt"
         )
 
 results = list(unique.values())
@@ -178,18 +367,69 @@ results.sort(
     reverse=True
 )
 
-# Ergebnisse speichern
+
+# ---------------------------------------
+# 4. NACH BUNDESLAND SORTIEREN
+# ---------------------------------------
+
+for state in STATES:
+
+    state_results = [
+        item for item in results
+        if item["state"] == state
+    ]
+
+    print("--------------------------------")
+    print(state)
+    print("Gefundene Treffer:", len(state_results))
+
+    for item in state_results:
+        print(
+            item["woodpellet_check"],
+            "-",
+            item["title"]
+        )
+
+
+# ---------------------------------------
+# 5. ERGEBNISSE SPEICHERN
+# ---------------------------------------
+
 DATA_FILE.parent.mkdir(
     parents=True,
     exist_ok=True
 )
 
+confirmed = sum(
+    1 for item in results
+    if item["woodpellet_check"]
+    == "Holzpellets eindeutig erkannt"
+)
+
+review = len(results) - confirmed
+
 snapshot = {
     "updated_at": datetime.now(
         ZoneInfo("Europe/Berlin")
     ).isoformat(timespec="seconds"),
+
     "results": results,
-    "errors": all_errors
+
+    "errors": errors,
+
+    "search_stats": search_stats,
+
+    "statistics": {
+        "states": len(STATES),
+        "search_terms": len(SEARCH_TERMS),
+        "search_requests": len(search_stats),
+        "candidates": len(candidates),
+        "detail_requests": detail_count,
+        "detail_errors": detail_errors,
+        "total_results": len(results),
+        "confirmed_woodpellets": confirmed,
+        "manual_review": review
+    }
 }
 
 DATA_FILE.write_text(
@@ -201,16 +441,28 @@ DATA_FILE.write_text(
     encoding="utf-8"
 )
 
+
+# ---------------------------------------
+# 6. ABSCHLUSSMELDUNG
+# ---------------------------------------
+
 print("--------------------------------")
 print("HOLZPELLETS-RADAR ABGESCHLOSSEN")
-print("Suchbegriffe:", len(SEARCH_TERMS))
-print("Bundesländer:", len(STATES))
-print("Suchanfragen:", len(STATES) * len(SEARCH_TERMS))
-print("Gefundene Treffer:", len(results))
-print("Davon mit erkanntem Holzpellet-Bezug:",
-      sum(
-          1 for x in results
-          if x["woodpellet_check"] == "Holzpellet-Bezug erkannt"
-      ))
-print("Fehler:", len(all_errors))
+print("--------------------------------")
+
+print("Suchanfragen:", len(search_stats))
+print("Gefundene Kandidaten:", len(candidates))
+print("Detailabrufe:", detail_count)
+
+print("Holzpellets eindeutig:", confirmed)
+print("Manuelle Prüfung:", review)
+
+print("Fehler:", len(errors))
+
+if errors:
+    print("HINWEIS: Suche möglicherweise unvollständig.")
+else:
+    print("Alle ausgeführten Abfragen abgeschlossen.")
+
+print("Ergebnisse gespeichert:", DATA_FILE)
 print("--------------------------------")
