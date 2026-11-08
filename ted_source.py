@@ -61,22 +61,39 @@ def _state_from_nuts(values):
     return None
 
 
-def _category(text, cpv):
-    t = text.lower()
-    if re.search(r"holz[\s-]*pellet|pellet[\s-]*holz|wood[\s-]*pellet", t):
-        return "Holzpellets eindeutig"
-    if any(str(code).startswith("09111400") for code in cpv):
+def _category(title, description, cpv):
+    """Nur belastbare Beschaffungssignale; Projekt- und Zufallsnennungen ausschließen."""
+    title_text = str(title or "").lower()
+    description_text = str(description or "").lower()
+    cpv = [str(code) for code in (cpv or [])]
+    if any(code.startswith("09111400") for code in cpv):
         return "Holzbrennstoff – CPV 09111400"
-    if re.search(r"holz[\s-]*hack[\s-]*schnitzel|wood[\s-]*chips|hackschnitzel", t):
+    if any(code.startswith("03413000") for code in cpv):
         return "Holzhackschnitzel – prüfen"
-    if re.search(r"holzbrikett|wood[\s-]*briquette|holzbrennstoff|wood[\s-]*fuel", t):
+    project_terms = ("kesselanlage", "biomassekessel", "heizungsanlage",
+        "pelletheizung", "pelletfeuerung", "wärmeerzeugung", "umstellung",
+        "neubau", "sanierung", "installation", "montage", "errichtung")
+    if any(term in title_text for term in project_terms):
+        return None
+    procurement = ("liefer", "beschaffung", "bedarf", "rahmenvereinbarung",
+        "brennstoff", "versorgung", "abnahme")
+    if re.search(r"holz[\\s-]*pellet|pellet[\\s-]*holz|wood[\\s-]*pellet", title_text):
+        if any(term in title_text for term in procurement) or any(
+            term in description_text for term in ("liefer", "beschaffung", "bedarf", "brennstoff", "versorgung")
+        ):
+            return "Holzpellets eindeutig"
+        return None
+    if re.search(r"holz[\\s-]*hack[\\s-]*schnitzel|hackschnitzel|wood[\\s-]*chips", title_text):
+        if any(term in title_text + " " + description_text for term in procurement):
+            return "Holzhackschnitzel – prüfen"
+        return None
+    if re.search(r"holzbrikett|wood[\\s-]*briquette|holzbrennstoff|wood[\\s-]*fuel", title_text):
         return "Sonstiger Holzbrennstoff"
-    if re.search(r"\bbks\b|braunkohle|steinkohle|\bkohle\b", t):
+    if re.search(r"\\bbks\\b|braunkohle|steinkohle|\\bkohle\\b", title_text):
         return "BKS / Kohle / Briketts"
-    if "pellet" in t:
+    if "pellet" in title_text and any(term in title_text + " " + description_text for term in procurement):
         return "Pellets – Holzart prüfen"
     return None
-
 
 def _search(session, query, limit=100, max_pages=50):
     """Fetch every TED page; never silently accept a truncated result set."""
