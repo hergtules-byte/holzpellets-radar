@@ -10,7 +10,7 @@ import streamlit as st
 # =====================================
 
 st.set_page_config(
-    page_title="Holzpellets-Ausschreibungsradar",
+    page_title="Pellet und Kohle-Ausschreibungsradar",
     page_icon="🌲",
     layout="wide"
 )
@@ -141,7 +141,7 @@ for item in results:
 # KOPFBEREICH
 # =====================================
 
-st.title("🌲 Holzpellets-Ausschreibungsradar")
+st.title("🌲 Pellet und Kohle-Ausschreibungsradar")
 
 st.caption(
     "Tägliche Suche nach Ausschreibungen "
@@ -390,7 +390,7 @@ with st.expander("Suchstatistik und technische Details"):
 st.divider()
 
 st.caption(
-    "Holzpellets-Ausschreibungsradar | "
+    "Pellet und Kohle-Ausschreibungsradar | "
     "Datenquelle: Vergabeweiser"
 )
 
