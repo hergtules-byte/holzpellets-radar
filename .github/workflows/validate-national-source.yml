@@ -141,6 +141,7 @@ jobs:
               raise SystemExit("TED-Abfragen teilweise fehlgeschlagen.")
           PY
       - name: Importer-Schnittstellen ohne Live-Vollabruf prüfen
+        if: always()
         run: |
           python - <<'PY'
           from national_source import fetch_national_notices
