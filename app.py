@@ -27,7 +27,7 @@ DATA_FILE = Path("data/latest.json")
 
 CATEGORIES = [
     "Holzpellet-Ausschreibungen",
-    "Pellet-Projekte",
+    "Pellet-Projekte (Prüfkandidaten)",
     "Holzhackschnitzel",
     "Weitere Holzbrennstoffe",
     "BKS / Kohle / Briketts",
@@ -106,13 +106,13 @@ def classify_result(item):
     if is_project and (
         "pellet" in text or "biomasse" in text
     ):
-        return "Pellet-Projekte"
+        return "Pellet-Projekte (Prüfkandidaten)"
 
     if "holzpellets eindeutig" in label:
         return "Holzpellet-Ausschreibungen"
 
     if "pellets" in label:
-        return "Pellet-Projekte"
+        return "Pellet-Projekte (Prüfkandidaten)"
 
     if (
         "holzbrennstoff" in label
@@ -170,7 +170,7 @@ pellet_count = sum(
 
 project_count = sum(
     1 for x in results
-    if x["display_category"] == "Pellet-Projekte"
+    if x["display_category"] == "Pellet-Projekte (Prüfkandidaten)"
 )
 
 chip_count = sum(
@@ -192,7 +192,7 @@ col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric("Alle Treffer", len(results))
 col2.metric("Holzpellet-Ausschreibungen", pellet_count)
-col3.metric("Pellet-Projekte", project_count)
+col3.metric("Pellet-Projekte (Prüfkandidaten)", project_count)
 col4.metric("Weitere Holzbrennstoffe", chip_count + other_count)
 col5.metric("BKS / Kohle / Briketts", other_fuel_count)
 
@@ -294,6 +294,17 @@ for state in STATES:
                     st.caption(
                         "Einordnung: " + category
                     )
+
+                    if category == "Pellet-Projekte (Prüfkandidaten)":
+                        st.warning(
+                            "Prüfkandidat: Das ist ein Heizungs-/Wärmeprojekt. "
+                            "Eine konkrete Brennstofflieferung ist bislang nicht belegt."
+                        )
+                    else:
+                        st.caption(
+                            "Brennstoffsignal erkannt – Lieferumfang und Produktart "
+                            "bitte in der Originalbekanntmachung verifizieren."
+                        )
 
                     if item.get("source"):
                         source_label = str(item["source"])
