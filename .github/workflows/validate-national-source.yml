@@ -114,7 +114,8 @@ jobs:
               'FT~"pellets"',
               'FT~"wood pellets"',
               'FT~"Holzhackschnitzel"',
-              'PD>=20261101',
+              '(place-of-performance IN (DEU))',
+              '(ojs-number=180/2023) AND (place-of-performance IN (DEU))',
           ]
           fields = ["publication-number", "publication-date", "notice-title",
                     "publication-date", "place-of-performance", "description-glo"]
