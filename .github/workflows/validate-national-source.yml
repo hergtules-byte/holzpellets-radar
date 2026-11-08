@@ -47,3 +47,13 @@ jobs:
                       for row in rows[:2]:
                           print("SAMPLE:", {k:v for k,v in row.items() if v})
           PY
+      - name: CSV-Importer live testen
+        run: |
+          python - <<'PY'
+          from national_source import fetch_national_notices
+          rows, stats = fetch_national_notices()
+          print("Exportstatistik:", stats)
+          print("Treffer:", len(rows))
+          for row in rows[:30]:
+              print(row["state"], "|", row["woodpellet_check"], "|", row["title"][:140])
+          PY
