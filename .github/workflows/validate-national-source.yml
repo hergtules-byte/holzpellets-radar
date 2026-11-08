@@ -104,29 +104,27 @@ jobs:
           print("\nALL UNIQUE ORGANISATION SUBDIVISIONS:")
           print(sorted({(x.get("organisationCountrySubdivision",""),x.get("organisationCountryCode","")) for x in orgs}))
           PY
-      - name: TED API-Suchbegriffe und Felder validieren
+      - name: TED-Kontrollabfrage mit dokumentiertem Datumsfilter
         run: |
           python - <<'PY'
           import requests
           url = "https://api.ted.europa.eu/v3/notices/search"
-          queries = [
-              'FT~"holzpellets"',
-              'FT~"pellets"',
-              'FT~"wood pellets"',
-              'FT~"Holzhackschnitzel"',
-              '(place-of-performance IN (DEU))',
-              '(ojs-number=180/2023) AND (place-of-performance IN (DEU))',
-          ]
-          fields = ["publication-number", "publication-date", "notice-title",
-                    "publication-date", "place-of-performance", "description-glo"]
-          for query in queries:
-              body = {"query": query, "fields": fields, "limit": 5,
-                      "page": 1, "scope": "ALL", "checkQuerySyntax": True}
-              r = requests.post(url, json=body, timeout=90)
-              print("\\nQUERY:", query, "| HTTP:", r.status_code)
-              print("RESPONSE:", r.text[:2500])
-              r.raise_for_status()
-              data = r.json()
-              print("COUNT:", data.get("totalNoticeCount"),
-                    "| RECORDS:", len(data.get("notices", [])))
+          body = {
+              "query": "publication-date=20261102",
+              "fields": ["publication-number", "publication-date", "notice-title"],
+              "page": 1,
+              "limit": 5,
+              "paginationMode": "PAGE_NUMBER",
+              "scope": "ALL"
+          }
+          r = requests.post(url, json=body, timeout=90)
+          print("HTTP:", r.status_code)
+          print("RESPONSE:", r.text[:5000])
+          r.raise_for_status()
+          data = r.json()
+          print("COUNT:", data.get("totalNoticeCount"),
+                "| RECORDS:", len(data.get("notices", [])),
+                "| TIMED OUT:", data.get("timedOut"))
+          if not data.get("notices"):
+              raise SystemExit("TED-Kontrollabfrage hat keine Datensätze geliefert.")
           PY
