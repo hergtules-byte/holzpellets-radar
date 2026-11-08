@@ -61,9 +61,13 @@ def _category(text, cpv_codes):
     return None
 
 
-def fetch_national_notices():
-    """Lädt CSV-Export des abgeschlossenen Vortages und filtert fünf Bundesländer."""
-    day = datetime.now(ZoneInfo("Europe/Berlin")).date() - timedelta(days=1)
+def fetch_national_notices(publication_day=None):
+    """Lädt CSV-Export eines Veröffentlichungstags (Standard: Vortag)."""
+    day = (
+        datetime.now(ZoneInfo("Europe/Berlin")).date() - timedelta(days=1)
+        if publication_day is None
+        else datetime.fromisoformat(str(publication_day)).date()
+    )
     response = requests.get(
         API_URL,
         params={"pubDay": day.isoformat(), "format": "csv.zip"},
