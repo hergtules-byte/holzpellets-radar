@@ -21,12 +21,68 @@ jobs:
         run: python -m compileall -q app.py update_data.py national_source.py
       - name: Abhängigkeiten installieren
         run: pip install requests
-      - name: OpenData-Export live abrufen und auswerten
+      - name: OpenData-Exportstruktur untersuchen
+        run: |
+          python - <<'PY'
+          import io, json, zipfile
+          from datetime import date, timedelta
+          from zoneinfo import ZoneInfo
+          import requests
+          day = (date.today() - timedelta(days=1)).isoformat()
+          response = requests.get(
+              "https://oeffentlichevergabe.de/api/notice-exports",
+              params={"pubDay": day, "format": "ocds.zip"},
+              timeout=120,
+          )
+          response.raise_for_status()
+          print("Exporttag:", day)
+          print("HTTP:", response.status_code, "Content-Type:", response.headers.get("Content-Type"))
+          with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+              files = [n for n in z.namelist() if n.lower().endswith(".json")]
+              print("ZIP-Dateien insgesamt:", len(z.namelist()))
+              print("JSON-Dateien:", len(files))
+              release_count = 0
+              sample = []
+              for name in files:
+                  try:
+                      payload = json.loads(z.read(name).decode("utf-8-sig"))
+                  except Exception as exc:
+                      print("JSON-Fehler:", name, type(exc).__name__)
+                      continue
+                  releases = payload.get("releases", []) if isinstance(payload, dict) else []
+                  release_count += len(releases)
+                  for release in releases:
+                      if len(sample) < 3:
+                          tender = release.get("tender") or {}
+                          parties = release.get("parties") or []
+                          buyer = next((p for p in parties if "buyer" in (p.get("roles") or [])), {})
+                          sample.append({
+                              "release_keys": sorted(release.keys()),
+                              "tag": release.get("tag"),
+                              "date": release.get("date"),
+                              "tender_keys": sorted(tender.keys()),
+                              "tender_title_present": bool(tender.get("title")),
+                              "item_count": len(tender.get("items") or []),
+                              "item_classifications": [
+                                  (i.get("classification") or {}).get("id")
+                                  for i in (tender.get("items") or [])[:3]
+                              ],
+                              "buyer_keys": sorted(buyer.keys()),
+                              "buyer_address": buyer.get("address"),
+                              "tender_period": tender.get("tenderPeriod"),
+                              "has_documents": bool(release.get("documents") or tender.get("documents")),
+                          })
+              print("Bekanntmachungen (releases) insgesamt:", release_count)
+              print("Beispiel-Feldstruktur (max. 3, ohne Titel/Käufername):")
+              print(json.dumps(sample, ensure_ascii=False, indent=2)[:12000])
+          PY
+      - name: OpenData-Filter ausführen
         run: |
           python - <<'PY'
           from national_source import fetch_national_notices
-          rows, day = fetch_national_notices()
-          print(f"Export {day}: {len(rows)} passende Treffer")
+          rows, meta = fetch_national_notices()
+          print("Filter-Ergebnis:", meta)
+          print("Treffer:", len(rows))
           for row in rows[:20]:
               print(row["state"], row["woodpellet_check"], row["title"][:120])
           PY
