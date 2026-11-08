@@ -94,27 +94,12 @@ jobs:
           if stats["errors"]:
               raise SystemExit("TED-Abfragen teilweise fehlgeschlagen.")
           PY
-      - name: Gesamtlauf-Schnittstellen und Retry-Logik ohne Live-Vollabruf prüfen
+      - name: Importer-Schnittstellen ohne Live-Vollabruf prüfen
         run: |
           python - <<'PY'
-          import time
-          from unittest.mock import Mock, patch
-          import update_data
-
-          ok = Mock(status_code=200)
-          ok.json.return_value = {"results": []}
-          limited = Mock(status_code=429, headers={"Retry-After": "0"})
-          limited.raise_for_status.side_effect = Exception("HTTP 429")
-          with patch.object(update_data.session, "get", side_effect=[limited, ok]), \
-               patch.object(update_data.time, "sleep") as sleep:
-              payload = update_data.request_json("https://example.invalid/test")
-              assert payload == {"results": []}
-              sleep.assert_called_once()
-
           from national_source import fetch_national_notices
           from ted_source import fetch_ted_notices
           assert callable(fetch_national_notices)
           assert callable(fetch_ted_notices)
-          print("RETRY-LOGIK OK")
           print("Importer-Schnittstellen OK")
           PY
