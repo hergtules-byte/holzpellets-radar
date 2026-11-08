@@ -113,6 +113,17 @@ def read_vergabeweiser_pause():
             return until
     except (OSError, ValueError, KeyError, TypeError):
         pass
+    try:
+        snapshot = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        saved = snapshot.get("statistics", {}).get("vergabeweiser_paused_until")
+        if saved:
+            until = datetime.fromisoformat(saved)
+            if until.tzinfo is None:
+                until = until.replace(tzinfo=timezone.utc)
+            if until > datetime.now(timezone.utc):
+                return until
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
     return None
 
 
@@ -645,7 +656,11 @@ snapshot = {
         "ted_source_since": ted_stats.get("since"),
         "ted_source_queries": ted_stats.get("queries", 0),
         "ted_source_raw_notices": ted_stats.get("raw_notices", 0),
-        "ted_source_errors": len(ted_stats.get("errors", []))
+        "ted_source_errors": len(ted_stats.get("errors", [])),
+        "vergabeweiser_paused_until": (
+            vergabeweiser_paused_until.isoformat()
+            if vergabeweiser_paused_until else None
+        )
     }
 }
 
