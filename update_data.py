@@ -167,8 +167,8 @@ def classify(item, detail):
     # 5. Fossile bzw. sonstige Brennstoffe separat erfassen.
     # Holzbriketts wurden oben bereits als Holzbrennstoff eingeordnet.
     if re.search(
-        r"\\bbks\\b|braunkohlestaub|braunkohle|steinkohle|"
-        r"\\bkohle\\b|briketts?",
+        r"\bbks\b|braunkohlestaub|braunkohle|steinkohle|"
+        r"\bkohle\b|briketts?",
         full_text
     ):
         return "BKS / Kohle / Briketts", combined
