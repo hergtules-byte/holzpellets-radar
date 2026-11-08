@@ -130,6 +130,9 @@ jobs:
               )
               elapsed = time.monotonic() - started
               print(f"Vergabeweiser: HTTP {response.status_code}; Antwortzeit={elapsed:.2f}s; Retry-After={response.headers.get('Retry-After', 'nicht gesetzt')}")
+              if response.status_code == 429:
+                  print("Rate-Limit eindeutig erkannt; keine Wiederholung ausgelöst.")
+                  raise SystemExit(0)
               response.raise_for_status()
               payload = response.json()
               print(f"JSON erfolgreich; Ergebnisse={len(payload.get('results', []))}; Gesamt={payload.get('total', 'unbekannt')}")
