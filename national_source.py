@@ -44,6 +44,40 @@ def _text(value):
     return str(value or "").strip()
 
 
+def _state_for_code(code):
+    code = _text(code).upper()
+    return next((name for prefix, name in STATE_PREFIXES.items()
+                 if code.startswith(prefix)), None)
+
+
+def _resolve_state(place_rows, organisation_rows):
+    """Leistungsort hat Vorrang; Auftraggebersitz nur ohne Orts-Bundesland."""
+    place_regions = [
+        (_text(row.get("placePerformanceCountrySubdivision")),
+         " ".join(filter(None, (
+             _text(row.get("placePerformancePostCode")),
+             _text(row.get("placePerformanceCity")),
+         ))))
+        for row in place_rows
+        if _text(row.get("placePerformanceCountrySubdivision"))
+    ]
+    for code, place in place_regions:
+        state = _state_for_code(code)
+        if state:
+            return state, place
+
+    # Ein expliziter Leistungsort außerhalb der Zielregion darf nicht
+    # durch den Sitz des Auftraggebers in die Zielregion verschoben werden.
+    if place_regions:
+        return None, ""
+
+    for row in organisation_rows:
+        state = _state_for_code(row.get("organisationCountrySubdivision"))
+        if state:
+            return state, _text(row.get("organisationCity"))
+    return None, ""
+
+
 def _category(title, description, cpv_codes):
     """Konservative fachliche Einordnung; beiläufige Textnennungen reichen nicht."""
     title_text = _text(title).lower()
@@ -74,6 +108,7 @@ def _category(title, description, cpv_codes):
     ) and not re.search(r"kunststoff|polymer|compoundier|spritzgieß|granulat", title_text):
         return "Pellets – Holzart prüfen"
     return None
+
 
 def fetch_national_notices(publication_day=None, include_diagnostics=False):
     """Lädt CSV-Export eines Veröffentlichungstags (Standard: Vortag)."""
@@ -141,32 +176,12 @@ def fetch_national_notices(publication_day=None, include_diagnostics=False):
             continue
         stats["matched_keyword"] += 1
 
-        state = None
-        place = ""
-        for row in pl_rows:
-            code = _text(row.get("placePerformanceCountrySubdivision")).upper()
-            state = next((name for prefix, name in STATE_PREFIXES.items()
-                          if code.startswith(prefix)), None)
-            if state:
-                place = " ".join(filter(None, (
-                    _text(row.get("placePerformancePostCode")),
-                    _text(row.get("placePerformanceCity")),
-                )))
-                break
-        if not state:
-            for row in o_rows:
-                code = _text(row.get("organisationCountrySubdivision")).upper()
-                state = next((name for prefix, name in STATE_PREFIXES.items()
-                              if code.startswith(prefix)), None)
-                if state:
-                    place = _text(row.get("organisationCity"))
-                    break
+        state, place = _resolve_state(pl_rows, o_rows)
         if not state:
             continue
         stats["matched_state"] += 1
 
         category = _category(title, description, cpv_codes)
-        # Auch ausgeschlossene Kandidaten für die Qualitätsprüfung sichern.
         if include_diagnostics:
             stats["review_candidates"].append({
                 "id": _text(notice.get("noticeIdentifier")),
