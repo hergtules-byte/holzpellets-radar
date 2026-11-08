@@ -57,7 +57,7 @@ jobs:
           for row in rows[:30]:
               print(row["state"], "|", row["woodpellet_check"], "|", row["title"][:140])
           PY
-      - name: Bekanntmachungsservice über sieben Veröffentlichungstage auswerten
+      - name: Bekanntmachungsservice über 30 Veröffentlichungstage auswerten
         run: |
           python - <<'PY'
           import json
@@ -65,7 +65,7 @@ jobs:
           from national_source import fetch_national_notices
           totals = {"notices": 0, "keyword": 0, "state": 0, "results": 0}
           report = {"days": [], "totals": totals}
-          for offset in range(1, 8):
+          for offset in range(1, 31):
               day = date.today() - timedelta(days=offset)
               rows, stats = fetch_national_notices(publication_day=day.isoformat(), include_diagnostics=True)
               entry = {
@@ -90,14 +90,14 @@ jobs:
                                     ("state", "matched_state"),
                                     ("results", "results")):
                   totals[key] += stats.get(stat_key, 0)
-          print("7-Tage-Gesamtauswertung:", totals)
+          print("30-Tage-Gesamtauswertung:", totals)
           with open("national_source_quality.json", "w", encoding="utf-8") as output:
               json.dump(report, output, ensure_ascii=False, indent=2)
           PY
-      - name: Sieben-Tage-Trefferbericht als Artefakt speichern
+      - name: 30-Tage-Trefferbericht als Artefakt speichern
         uses: actions/upload-artifact@v4
         with:
-          name: national-source-quality-report
+          name: national-source-quality-30-day-report
           path: national_source_quality.json
           if-no-files-found: error
           retention-days: 14
