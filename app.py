@@ -295,6 +295,12 @@ for state in STATES:
                         "Einordnung: " + category
                     )
 
+                    if item.get("source"):
+                        source_label = str(item["source"])
+                        if item.get("also_found_in"):
+                            source_label += " (ebenfalls gefunden bei: " + ", ".join(item["also_found_in"]) + ")"
+                        st.caption("Datenquelle: " + source_label)
+
                     if item.get("buyer"):
                         st.write(
                             "**Auftraggeber:**",
