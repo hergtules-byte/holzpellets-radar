@@ -364,9 +364,9 @@ national_stats = {"results": 0, "publication_day": None, "errors": []}
 try:
     from national_source import fetch_national_notices
 
-    national_results, publication_day = fetch_national_notices()
+    national_results, source_stats = fetch_national_notices()
+    national_stats.update(source_stats)
     national_stats["results"] = len(national_results)
-    national_stats["publication_day"] = publication_day
 
     # Bestehende Treffer nicht überschreiben; dubbele Notice-IDs vermeiden.
     existing_ids = {str(item.get("id")) for item in results.values()}
@@ -378,7 +378,7 @@ try:
         "Bekanntmachungsservice:",
         len(national_results),
         "passende Treffer für",
-        publication_day
+        national_stats["publication_day"]
     )
 except Exception as error:
     message = f"Bekanntmachungsservice: {error}"
