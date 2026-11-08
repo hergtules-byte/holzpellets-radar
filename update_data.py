@@ -356,7 +356,39 @@ for tender_id, candidate in candidates.items():
 
 
 # =====================================
-# 3. SORTIEREN
+# 3. OFFIZIELLER BEKANNTMACHUNGSSERVICE
+# =====================================
+
+national_stats = {"results": 0, "publication_day": None, "errors": []}
+
+try:
+    from national_source import fetch_national_notices
+
+    national_results, publication_day = fetch_national_notices()
+    national_stats["results"] = len(national_results)
+    national_stats["publication_day"] = publication_day
+
+    # Bestehende Treffer nicht überschreiben; dubbele Notice-IDs vermeiden.
+    existing_ids = {str(item.get("id")) for item in results.values()}
+    for item in national_results:
+        if str(item.get("id")) not in existing_ids:
+            results["national-" + str(item.get("id"))] = item
+
+    print(
+        "Bekanntmachungsservice:",
+        len(national_results),
+        "passende Treffer für",
+        publication_day
+    )
+except Exception as error:
+    message = f"Bekanntmachungsservice: {error}"
+    national_stats["errors"].append(message)
+    errors.append(message)
+    print("Fehler beim Bekanntmachungsservice:", error)
+
+
+# =====================================
+# 4. SORTIEREN
 # =====================================
 
 all_results = list(results.values())
@@ -447,7 +479,9 @@ snapshot = {
         "cpv_wood_fuels": cpv_results,
         "manual_review": review,
         "other_fuels_bks_coal_briquettes": other_fuels,
-        "errors": len(errors)
+        "errors": len(errors),
+        "national_source_results": national_stats["results"],
+        "national_source_publication_day": national_stats["publication_day"]
     }
 }
 
