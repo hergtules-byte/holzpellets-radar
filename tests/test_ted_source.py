@@ -42,6 +42,34 @@ class TedSourceTests(unittest.TestCase):
         self.assertEqual(len(rows), 3)
         self.assertEqual([c.kwargs["json"]["page"] for c in session.post.call_args_list], [1, 2])
 
+    def test_429_then_success_retries(self):
+        session = Mock()
+        session.post.side_effect = [
+            FakeResponse({}, status=429, headers={"Retry-After": "0"}),
+            FakeResponse({"totalNoticeCount": 1, "notices": [{"id": 1}]}),
+        ]
+        with patch("ted_source.time.sleep"):
+            self.assertEqual(len(_search(session, "query", limit=2)), 1)
+        self.assertEqual(session.post.call_count, 2)
+
+    def test_503_then_success_retries(self):
+        session = Mock()
+        session.post.side_effect = [
+            FakeResponse({}, status=503),
+            FakeResponse({"totalNoticeCount": 1, "notices": [{"id": 1}]}),
+        ]
+        with patch("ted_source.time.sleep"):
+            self.assertEqual(len(_search(session, "query", limit=2)), 1)
+        self.assertEqual(session.post.call_count, 2)
+
+    def test_repeated_429_fails_after_retry_limit(self):
+        session = Mock()
+        session.post.side_effect = [FakeResponse({}, status=429)] * 4
+        with patch("ted_source.time.sleep"):
+            with self.assertRaisesRegex(RuntimeError, "429"):
+                _search(session, "query", limit=2)
+        self.assertEqual(session.post.call_count, 4)
+
     def test_page_cap_never_silently_truncates(self):
         session = Mock()
         session.post.side_effect = [
