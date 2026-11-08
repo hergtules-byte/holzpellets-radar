@@ -67,7 +67,7 @@ jobs:
           report = {"days": [], "totals": totals}
           for offset in range(1, 8):
               day = date.today() - timedelta(days=offset)
-              rows, stats = fetch_national_notices(publication_day=day.isoformat())
+              rows, stats = fetch_national_notices(publication_day=day.isoformat(), include_diagnostics=True)
               entry = {
                   "date": day.isoformat(),
                   "statistics": stats,
