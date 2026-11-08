@@ -78,35 +78,39 @@ def _category(text, cpv):
     return None
 
 
-def _search(session, query, limit=100):
-    body = {
-        "query": query,
-        "fields": FIELDS,
-        "page": 1,
-        "limit": limit,
-        "paginationMode": "PAGE_NUMBER",
-        "scope": "ALL",
-    }
-    # TED throttles bursty anonymous searches. Retry 429/5xx responses with
-    # bounded exponential backoff; honor a numeric Retry-After when provided.
-    for attempt in range(4):
-        response = session.post(API_URL, json=body, timeout=90)
-        if response.status_code == 429 or response.status_code >= 500:
-            if attempt == 3:
-                response.raise_for_status()
-            retry_after = response.headers.get("Retry-After", "")
-            try:
-                delay = float(retry_after)
-            except (TypeError, ValueError):
-                delay = 1.5 * (2 ** attempt)
-            time.sleep(min(max(delay, 0.5), 20))
-            continue
-        response.raise_for_status()
-        break
-    payload = response.json()
-    if payload.get("timedOut"):
-        raise RuntimeError(f"TED search timed out for query: {query}")
-    return payload.get("notices", [])
+def _search(session, query, limit=100, max_pages=50):
+    """Fetch every TED page; never silently accept a truncated result set."""
+    notices = []
+    total = None
+    for page in range(1, max_pages + 1):
+        body = {"query": query, "fields": FIELDS, "page": page, "limit": limit,
+                "paginationMode": "PAGE_NUMBER", "scope": "ALL"}
+        for attempt in range(4):
+            response = session.post(API_URL, json=body, timeout=90)
+            if response.status_code == 429 or response.status_code >= 500:
+                if attempt == 3:
+                    response.raise_for_status()
+                try:
+                    delay = float(response.headers.get("Retry-After", ""))
+                except (TypeError, ValueError):
+                    delay = 1.5 * (2 ** attempt)
+                time.sleep(min(max(delay, 0.5), 20))
+                continue
+            response.raise_for_status()
+            break
+        payload = response.json()
+        if payload.get("timedOut"):
+            raise RuntimeError(f"TED search timed out for query: {query}")
+        batch = payload.get("notices", [])
+        notices.extend(batch)
+        if total is None and payload.get("totalNoticeCount") is not None:
+            total = int(payload["totalNoticeCount"])
+        if not batch or len(batch) < limit or (total is not None and len(notices) >= total):
+            return notices
+        time.sleep(0.2)
+    if total is None or len(notices) < total:
+        raise RuntimeError(f"TED pagination limit reached: retrieved {len(notices)} of {total} notices")
+    return notices
 
 
 def fetch_ted_notices(days_back=60):
@@ -166,8 +170,7 @@ def fetch_ted_notices(days_back=60):
         cpv = notice.get("classification-cpv") or []
         if isinstance(cpv, str):
             cpv = [cpv]
-        combined = " ".join((title, description))
-        category = _category(combined, cpv)
+        category = _category(title, description, cpv)
         if not category:
             continue
 
