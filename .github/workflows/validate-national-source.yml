@@ -110,7 +110,7 @@ jobs:
           import requests, json
           url = "https://api.ted.europa.eu/v3/notices/search"
           body = {
-              "query": 'FT=(holzpellets OR pellets OR holzhackschnitzel) AND buyer-country=DE',
+              "query": 'FT=(holzpellets OR pellets OR holzhackschnitzel)',
               "fields": ["publication-number", "publication-date", "BT-01-notice", "organisation-name-buyer", "place-of-performance", "description-glo"],
               "limit": 5,
               "page": 1,
