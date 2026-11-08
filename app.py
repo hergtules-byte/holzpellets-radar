@@ -125,85 +125,6 @@ def classify_result(item):
 
 
 # =====================================
-# VERTRIEBSPOTENZIAL BEWERTEN
-# =====================================
-
-def sales_profile(item):
-    """Ordnet Treffer nach erkennbarem Vertriebsansatz ein."""
-    buyer = str(item.get("buyer", ""))
-    title = str(item.get("title", ""))
-    description = str(item.get("description", ""))
-    trade = str(item.get("gewerk", ""))
-    text = " ".join([buyer, title, description, trade]).lower()
-
-    public_terms = [
-        "landratsamt", "gemeinde", "stadt ", "stadtverwaltung",
-        "landkreis", "zweckverband", "kommun", "schule",
-        "schullandheim", "krankenhaus", "klinikum", "universität",
-        "universitaet", "wohnungsbau", "wohnungsgesellschaft",
-        "wohnungsgenossenschaft", "pflegeheim", "seniorenheim"
-    ]
-    housing_terms = [
-        "wohnungsbau", "wohnungsgesellschaft",
-        "wohnungsgenossenschaft", "wohnungsunternehmen"
-    ]
-    education_health_terms = [
-        "schule", "schullandheim", "krankenhaus", "klinikum",
-        "universität", "universitaet", "pflegeheim", "seniorenheim"
-    ]
-    energy_terms = [
-        "wärme", "waerme", "energieversorgung", "stadtwerke",
-        "heizwerk", "biomassekessel", "wärmeversorgung",
-        "waermeversorgung"
-    ]
-
-    if any(term in buyer.lower() for term in housing_terms):
-        segment = "Wohnungswirtschaft"
-    elif any(term in text for term in education_health_terms):
-        segment = "Bildung & Soziales"
-    elif any(term in text for term in energy_terms):
-        segment = "Wärmeversorgung & Energie"
-    elif any(term in text for term in public_terms):
-        segment = "Öffentliche Hand"
-    else:
-        segment = "Sonstige Auftraggeber"
-
-    supply_terms = [
-        "lieferung von holzpellets", "lieferung von pellets",
-        "holzpelletlieferung", "pelletlieferung",
-        "bedarf an pellets", "jahresbedarf", "tonnen pellets",
-        "pellets für", "brennstofflieferung"
-    ]
-    project_terms = [
-        "umstellung", "pelletfeuerung", "pelletheizung",
-        "biomassekessel", "kesselanlage", "wärmeerzeugung",
-        "waermeerzeugung", "heizungsanlage", "errichtung",
-        "installation", "montage", "neubau", "sanierung"
-    ]
-
-    direct_supply = any(term in text for term in supply_terms)
-    pellet_context = "pellet" in text or "biomasse" in text
-    project_context = pellet_context and any(
-        term in text for term in project_terms
-    )
-
-    if direct_supply:
-        grade = "A"
-        reason = "Direkter Brennstoff- bzw. Pelletlieferbedarf erkennbar"
-    elif project_context and segment != "Sonstige Auftraggeber":
-        grade = "A"
-        reason = "Konkretes Pellet-/Biomasseprojekt bei öffentlichem oder institutionellem Kunden"
-    elif project_context or pellet_context:
-        grade = "B"
-        reason = "Projekt- oder Pelletbezug vorhanden; Lieferbedarf noch verifizieren"
-    else:
-        grade = "C"
-        reason = "Holzbrennstoff-Bezug nur indirekt – manuelle Prüfung empfohlen"
-
-    return grade, segment, reason
-
-
-# =====================================
 # DATEN VORBEREITEN
 # =====================================
 
@@ -215,10 +136,6 @@ statistics = data.get("statistics", {})
 
 for item in results:
     item["display_category"] = classify_result(item)
-    grade, segment, reason = sales_profile(item)
-    item["sales_grade"] = grade
-    item["customer_segment"] = segment
-    item["sales_reason"] = reason
 
 # =====================================
 # KOPFBEREICH
@@ -271,16 +188,13 @@ other_fuel_count = sum(
     if x["display_category"] == "BKS / Kohle / Briketts"
 )
 
-grade_a_count = sum(1 for x in results if x["sales_grade"] == "A")
-
-col1, col2, col3, col4, col5, col6 = st.columns(6)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric("Alle Treffer", len(results))
 col2.metric("Holzpellet-Ausschreibungen", pellet_count)
 col3.metric("Pellet-Projekte", project_count)
 col4.metric("Weitere Holzbrennstoffe", chip_count + other_count)
 col5.metric("BKS / Kohle / Briketts", other_fuel_count)
-col6.metric("Vertriebspotenzial A", grade_a_count)
 
 st.divider()
 
@@ -290,7 +204,7 @@ st.divider()
 
 st.header("Ausschreibungen und Projekte")
 
-filter_col1, filter_col2, filter_col3 = st.columns(3)
+filter_col1, filter_col2 = st.columns(2)
 
 with filter_col1:
     selected_state = st.selectbox(
@@ -302,12 +216,6 @@ with filter_col2:
     selected_category = st.selectbox(
         "Kategorie",
         ["Alle Kategorien"] + CATEGORIES
-    )
-
-with filter_col3:
-    selected_grade = st.selectbox(
-        "Vertriebspotenzial",
-        ["Alle Bewertungen", "A – hohe Priorität", "B – prüfen", "C – geringe Priorität"]
     )
 
 filtered = results
@@ -322,13 +230,6 @@ if selected_category != "Alle Kategorien":
     filtered = [
         x for x in filtered
         if x["display_category"] == selected_category
-    ]
-
-if selected_grade != "Alle Bewertungen":
-    grade_filter = selected_grade[0]
-    filtered = [
-        x for x in filtered
-        if x["sales_grade"] == grade_filter
     ]
 
 st.write(
@@ -393,15 +294,6 @@ for state in STATES:
                     st.caption(
                         "Einordnung: " + category
                     )
-
-                    grade = item.get("sales_grade", "C")
-                    segment = item.get("customer_segment", "Sonstige Auftraggeber")
-                    reason = item.get("sales_reason", "")
-
-                    st.markdown(
-                        f"**Vertriebspotenzial: {grade}** · Zielgruppe: **{segment}**"
-                    )
-                    st.caption(reason)
 
                     if item.get("buyer"):
                         st.write(
