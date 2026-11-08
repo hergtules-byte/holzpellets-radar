@@ -249,10 +249,11 @@ for state, slug in STATES.items():
                                 "term": term
                             }
 
+                # Pace every search request, including the last page of each term.
+                time.sleep(PAUSE)
+
                 if page >= data.get("pages", 1):
                     break
-
-                time.sleep(PAUSE)
 
             except Exception as error:
                 errors.append(
