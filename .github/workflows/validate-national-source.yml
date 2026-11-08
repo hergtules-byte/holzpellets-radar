@@ -104,27 +104,30 @@ jobs:
           print("\nALL UNIQUE ORGANISATION SUBDIVISIONS:")
           print(sorted({(x.get("organisationCountrySubdivision",""),x.get("organisationCountryCode","")) for x in orgs}))
           PY
-      - name: TED-Kontrollabfrage mit dokumentiertem Datumsfilter
+      - name: TED-Brennstoffsuche gegen echte Datumsstichprobe testen
         run: |
           python - <<'PY'
           import requests
           url = "https://api.ted.europa.eu/v3/notices/search"
-          body = {
-              "query": "publication-date=20261102",
-              "fields": ["publication-number", "publication-date", "notice-title"],
-              "page": 1,
-              "limit": 5,
-              "paginationMode": "PAGE_NUMBER",
-              "scope": "ALL"
-          }
-          r = requests.post(url, json=body, timeout=90)
-          print("HTTP:", r.status_code)
-          print("RESPONSE:", r.text[:5000])
-          r.raise_for_status()
-          data = r.json()
-          print("COUNT:", data.get("totalNoticeCount"),
-                "| RECORDS:", len(data.get("notices", [])),
-                "| TIMED OUT:", data.get("timedOut"))
-          if not data.get("notices"):
-              raise SystemExit("TED-Kontrollabfrage hat keine Datensätze geliefert.")
+          queries = [
+              "publication-date=20261102 AND FT~(\"pellets\")",
+              "publication-date=20261102 AND FT~(\"holzpellets\")",
+              "publication-date=20261102 AND FT~(\"wood pellets\")",
+              "publication-date=20261102 AND buyer-country=DEU",
+              "publication-date=20261102 AND classification-cpv=09111400",
+          ]
+          fields = ["publication-number", "publication-date", "notice-title",
+                    "buyer-name", "buyer-country", "classification-cpv",
+                    "place-of-performance", "deadline-receipt-tender-date-lot"]
+          for query in queries:
+              body = {"query": query, "fields": fields, "page": 1, "limit": 10,
+                      "paginationMode": "PAGE_NUMBER", "scope": "ALL"}
+              r = requests.post(url, json=body, timeout=90)
+              print("\\nQUERY:", query, "| HTTP:", r.status_code)
+              print("RESPONSE:", r.text[:3500])
+              r.raise_for_status()
+              data = r.json()
+              print("COUNT:", data.get("totalNoticeCount"),
+                    "| RECORDS:", len(data.get("notices", [])),
+                    "| TIMED OUT:", data.get("timedOut"))
           PY
