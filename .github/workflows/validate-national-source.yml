@@ -104,3 +104,22 @@ jobs:
           print("\nALL UNIQUE ORGANISATION SUBDIVISIONS:")
           print(sorted({(x.get("organisationCountrySubdivision",""),x.get("organisationCountryCode","")) for x in orgs}))
           PY
+      - name: TED API-Verbindung und Suchschema testen
+        run: |
+          python - <<'PY'
+          import requests, json
+          url = "https://api.ted.europa.eu/v3/notices/search"
+          body = {
+              "query": 'FT ~ (holzpellets OR pellets OR holzhackschnitzel)',
+              "fields": ["publication-number", "publication-date", "notice-title", "buyer-name", "place-of-performance", "notice-type", "link"],
+              "limit": 5,
+              "page": 1,
+              "scope": "ACTIVE",
+              "checkQuerySyntax": True
+          }
+          r = requests.post(url, json=body, timeout=90)
+          print("HTTP:", r.status_code)
+          print("Content-Type:", r.headers.get("Content-Type"))
+          print("Response:", r.text[:6000])
+          r.raise_for_status()
+          PY
