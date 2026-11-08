@@ -30,6 +30,7 @@ CATEGORIES = [
     "Pellet-Projekte",
     "Holzhackschnitzel",
     "Weitere Holzbrennstoffe",
+    "BKS / Kohle / Briketts",
     "Weitere Prüftreffer"
 ]
 
@@ -76,6 +77,11 @@ def classify_result(item):
     # Hackschnitzel separat behandeln
     if "hackschnitzel" in label:
         return "Holzhackschnitzel"
+
+    # BKS, Kohle und mineralische Briketts separat führen.
+    # Holzbriketts bleiben in der Holzbrennstoff-Kategorie.
+    if "bks / kohle / briketts" in label:
+        return "BKS / Kohle / Briketts"
 
     # Projekte anhand des Ausschreibungsinhalts erkennen
     project_terms = [
@@ -260,15 +266,21 @@ other_count = sum(
     if x["display_category"] == "Weitere Holzbrennstoffe"
 )
 
+other_fuel_count = sum(
+    1 for x in results
+    if x["display_category"] == "BKS / Kohle / Briketts"
+)
+
 grade_a_count = sum(1 for x in results if x["sales_grade"] == "A")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 
 col1.metric("Alle Treffer", len(results))
 col2.metric("Holzpellet-Ausschreibungen", pellet_count)
 col3.metric("Pellet-Projekte", project_count)
 col4.metric("Weitere Holzbrennstoffe", chip_count + other_count)
-col5.metric("Vertriebspotenzial A", grade_a_count)
+col5.metric("BKS / Kohle / Briketts", other_fuel_count)
+col6.metric("Vertriebspotenzial A", grade_a_count)
 
 st.divider()
 
