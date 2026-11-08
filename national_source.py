@@ -113,7 +113,8 @@ def fetch_national_notices(publication_day=None):
 
     found = {}
     stats = {"publication_day": day.isoformat(), "notices_in_export": len(notices),
-             "matched_keyword": 0, "matched_state": 0, "results": 0}
+             "matched_keyword": 0, "matched_state": 0, "results": 0,
+             "review_candidates": []}
     for notice in notices:
         key = _join_key(notice)
         p_rows = purpose_by.get(key, [])
@@ -164,6 +165,19 @@ def fetch_national_notices(publication_day=None):
         stats["matched_state"] += 1
 
         category = _category(title, description, cpv_codes)
+        # Auch ausgeschlossene Kandidaten für die Qualitätsprüfung sichern.
+        stats["review_candidates"].append({
+            "id": _text(notice.get("noticeIdentifier")),
+            "version": _text(notice.get("noticeVersion")),
+            "state": state,
+            "title": title,
+            "description": description,
+            "buyer": _text(buyer.get("organisationName")),
+            "place": place,
+            "cpv": sorted(set(cpv_codes)),
+            "notice_type": _text(notice.get("noticeType")),
+            "classification": category or "ausgefiltert – kein hinreichendes Brennstoffsignal",
+        })
         if not category:
             continue
 
