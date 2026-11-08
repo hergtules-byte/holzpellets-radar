@@ -87,8 +87,22 @@ def _search(session, query, limit=100):
         "paginationMode": "PAGE_NUMBER",
         "scope": "ALL",
     }
-    response = session.post(API_URL, json=body, timeout=90)
-    response.raise_for_status()
+    # TED throttles bursty anonymous searches. Retry 429/5xx responses with
+    # bounded exponential backoff; honor a numeric Retry-After when provided.
+    for attempt in range(4):
+        response = session.post(API_URL, json=body, timeout=90)
+        if response.status_code == 429 or response.status_code >= 500:
+            if attempt == 3:
+                response.raise_for_status()
+            retry_after = response.headers.get("Retry-After", "")
+            try:
+                delay = float(retry_after)
+            except (TypeError, ValueError):
+                delay = 1.5 * (2 ** attempt)
+            time.sleep(min(max(delay, 0.5), 20))
+            continue
+        response.raise_for_status()
+        break
     payload = response.json()
     if payload.get("timedOut"):
         raise RuntimeError(f"TED search timed out for query: {query}")
