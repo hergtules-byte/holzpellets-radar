@@ -4,7 +4,8 @@ import re
 import json
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 
 import requests
@@ -15,6 +16,7 @@ import requests
 
 API = "https://vergabeweiser.de/api/v1"
 DATA_FILE = Path("data/latest.json")
+VERGABEWEISER_PAUSE_FILE = Path("data/vergabeweiser_pause.json")
 
 STATES = {
     "Brandenburg": "brandenburg",
@@ -101,23 +103,64 @@ def get_value(value, *keys):
     return ""
 
 
+def read_vergabeweiser_pause():
+    try:
+        payload = json.loads(VERGABEWEISER_PAUSE_FILE.read_text(encoding="utf-8"))
+        until = datetime.fromisoformat(payload["paused_until"])
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=timezone.utc)
+        if until > datetime.now(timezone.utc):
+            return until
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+vergabeweiser_paused_until = read_vergabeweiser_pause()
+
+
+def save_vergabeweiser_pause(response):
+    retry_after = response.headers.get("Retry-After", "").strip()
+    now = datetime.now(timezone.utc)
+    try:
+        until = now + timedelta(seconds=max(1, int(float(retry_after))))
+    except (TypeError, ValueError, OverflowError):
+        try:
+            until = parsedate_to_datetime(retry_after).astimezone(timezone.utc)
+        except (TypeError, ValueError, OverflowError):
+            until = now + timedelta(hours=1)
+    if until <= now:
+        until = now + timedelta(minutes=1)
+    VERGABEWEISER_PAUSE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    VERGABEWEISER_PAUSE_FILE.write_text(
+        json.dumps({"paused_until": until.isoformat(), "reason": "HTTP 429"}, indent=2),
+        encoding="utf-8"
+    )
+    return until
+
+
+class VergabeweiserRateLimited(Exception):
+    pass
+
+
 def request_json(url, params=None, max_retries=4):
-    """Request JSON with bounded backoff for rate limits and transient server errors."""
-    for attempt in range(max_retries + 1):
-        response = session.get(
-            url,
-            params=params,
-            timeout=45
+    """Persist HTTP 429 cooldown and stop further calls to this provider."""
+    global vergabeweiser_paused_until
+    if vergabeweiser_paused_until and vergabeweiser_paused_until > datetime.now(timezone.utc):
+        raise VergabeweiserRateLimited(
+            f"Vergabeweiser pausiert bis {vergabeweiser_paused_until.isoformat()}"
         )
-        if response.status_code == 429 or response.status_code in (500, 502, 503, 504):
+    for attempt in range(max_retries + 1):
+        response = session.get(url, params=params, timeout=45)
+        if response.status_code == 429:
+            vergabeweiser_paused_until = save_vergabeweiser_pause(response)
+            raise VergabeweiserRateLimited(
+                f"HTTP 429; Vergabeweiser pausiert bis {vergabeweiser_paused_until.isoformat()}"
+            )
+        if response.status_code in (500, 502, 503, 504):
             if attempt >= max_retries:
                 response.raise_for_status()
-            retry_after = response.headers.get("Retry-After", "")
-            try:
-                wait_seconds = float(retry_after)
-            except (TypeError, ValueError):
-                wait_seconds = min(2 ** attempt, 30)
-            time.sleep(max(1, min(wait_seconds, 60)))
+            time.sleep(min(2 ** attempt, 30))
             continue
         response.raise_for_status()
         return response.json()
@@ -200,10 +243,17 @@ print("HOLZPELLETS-RADAR 4.0")
 print("Suche in fünf Bundesländern")
 print("--------------------------------")
 
-for state, slug in STATES.items():
+if vergabeweiser_paused_until:
+    message = f"Vergabeweiser wegen HTTP 429 bis {vergabeweiser_paused_until.isoformat()} pausiert; andere Quellen laufen weiter."
+    print(message)
+    errors.append(message)
+else:
+  for state, slug in STATES.items():
 
     for term in SEARCH_TERMS:
 
+        if vergabeweiser_paused_until:
+            break
         print(f"Suche: {state} – {term}")
 
         for page in range(1, MAX_PAGES + 1):
@@ -255,6 +305,10 @@ for state, slug in STATES.items():
                 if page >= data.get("pages", 1):
                     break
 
+            except VergabeweiserRateLimited as error:
+                errors.append(str(error))
+                print("Vergabeweiser pausiert:", error)
+                break
             except Exception as error:
                 errors.append(
                     f"{state} / {term}: {error}"
@@ -273,6 +327,10 @@ print("Prüfe vollständige Ausschreibungen")
 detail_count = 0
 
 for tender_id, candidate in candidates.items():
+
+    if vergabeweiser_paused_until:
+        print("Detailabrufe übersprungen: Vergabeweiser ist rate-limited.")
+        break
 
     if detail_count >= MAX_DETAIL_REQUESTS:
         errors.append(
@@ -359,6 +417,10 @@ for tender_id, candidate in candidates.items():
             result["title"]
         )
 
+    except VergabeweiserRateLimited as error:
+        errors.append(str(error))
+        print("Vergabeweiser pausiert:", error)
+        break
     except Exception as error:
         errors.append(
             f"Detail {tender_id}: {error}"
