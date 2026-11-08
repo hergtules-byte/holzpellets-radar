@@ -164,6 +164,7 @@ jobs:
               "national_source_results",
               "ted_source_results",
               "ted_source_queries",
+              "cross_source_duplicates_merged",
           ]
           missing = [key for key in required if key not in stats]
           if missing:
