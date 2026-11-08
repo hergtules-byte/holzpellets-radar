@@ -391,7 +391,7 @@ st.divider()
 
 st.caption(
     "Pellet und Kohle-Ausschreibungsradar | "
-    "Datenquellen: Vergabeweiser und Bekanntmachungsservice"
+    "Datenquellen: Vergabeweiser, Bekanntmachungsservice und TED"
 )
 
 st.caption(
