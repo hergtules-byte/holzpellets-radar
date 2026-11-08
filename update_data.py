@@ -388,6 +388,34 @@ except Exception as error:
 
 
 # =====================================
+# 4. TED ALS ZUSÄTZLICHE DATENQUELLE
+# =====================================
+
+ted_stats = {"results": 0, "errors": []}
+
+try:
+    from ted_source import fetch_ted_notices
+
+    ted_results, source_stats = fetch_ted_notices(days_back=60)
+    ted_stats.update(source_stats)
+    ted_stats["results"] = len(ted_results)
+
+    existing_ids = {str(item.get("id")) for item in results.values()}
+    for item in ted_results:
+        item_id = str(item.get("id"))
+        if item_id not in existing_ids:
+            results["ted-" + item_id] = item
+            existing_ids.add(item_id)
+
+    print("TED:", len(ted_results), "passende Treffer")
+except Exception as error:
+    message = f"TED: {error}"
+    ted_stats["errors"].append(message)
+    errors.append(message)
+    print("Fehler bei TED:", error)
+
+
+# =====================================
 # 4. SORTIEREN
 # =====================================
 
@@ -481,7 +509,12 @@ snapshot = {
         "other_fuels_bks_coal_briquettes": other_fuels,
         "errors": len(errors),
         "national_source_results": national_stats["results"],
-        "national_source_publication_day": national_stats["publication_day"]
+        "national_source_publication_day": national_stats["publication_day"],
+        "ted_source_results": ted_stats["results"],
+        "ted_source_since": ted_stats.get("since"),
+        "ted_source_queries": ted_stats.get("queries", 0),
+        "ted_source_raw_notices": ted_stats.get("raw_notices", 0),
+        "ted_source_errors": len(ted_stats.get("errors", []))
     }
 }
 
