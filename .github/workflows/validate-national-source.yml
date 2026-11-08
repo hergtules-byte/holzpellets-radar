@@ -21,68 +21,48 @@ jobs:
         run: python -m compileall -q app.py update_data.py national_source.py
       - name: Abhängigkeiten installieren
         run: pip install requests
-      - name: OpenData-Exportstruktur untersuchen
+      - name: Tagesexport in drei Formaten vergleichen
         run: |
           python - <<'PY'
-          import io, json, zipfile
+          import io, zipfile
           from datetime import date, timedelta
-          from zoneinfo import ZoneInfo
           import requests
           day = (date.today() - timedelta(days=1)).isoformat()
-          response = requests.get(
-              "https://oeffentlichevergabe.de/api/notice-exports",
-              params={"pubDay": day, "format": "ocds.zip"},
-              timeout=120,
-          )
-          response.raise_for_status()
-          print("Exporttag:", day)
-          print("HTTP:", response.status_code, "Content-Type:", response.headers.get("Content-Type"))
-          with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-              files = [n for n in z.namelist() if n.lower().endswith(".json")]
-              print("ZIP-Dateien insgesamt:", len(z.namelist()))
-              print("JSON-Dateien:", len(files))
-              release_count = 0
-              sample = []
-              for name in files:
-                  try:
-                      payload = json.loads(z.read(name).decode("utf-8-sig"))
-                  except Exception as exc:
-                      print("JSON-Fehler:", name, type(exc).__name__)
-                      continue
-                  releases = payload.get("releases", []) if isinstance(payload, dict) else []
-                  release_count += len(releases)
-                  for release in releases:
-                      if len(sample) < 3:
-                          tender = release.get("tender") or {}
-                          parties = release.get("parties") or []
-                          buyer = next((p for p in parties if "buyer" in (p.get("roles") or [])), {})
-                          sample.append({
-                              "release_keys": sorted(release.keys()),
-                              "tag": release.get("tag"),
-                              "date": release.get("date"),
-                              "tender_keys": sorted(tender.keys()),
-                              "tender_title_present": bool(tender.get("title")),
-                              "item_count": len(tender.get("items") or []),
-                              "item_classifications": [
-                                  (i.get("classification") or {}).get("id")
-                                  for i in (tender.get("items") or [])[:3]
-                              ],
-                              "buyer_keys": sorted(buyer.keys()),
-                              "buyer_address": buyer.get("address"),
-                              "tender_period": tender.get("tenderPeriod"),
-                              "has_documents": bool(release.get("documents") or tender.get("documents")),
-                          })
-              print("Bekanntmachungen (releases) insgesamt:", release_count)
-              print("Beispiel-Feldstruktur (max. 3, ohne Titel/Käufername):")
-              print(json.dumps(sample, ensure_ascii=False, indent=2)[:12000])
+          base = "https://oeffentlichevergabe.de/api/notice-exports"
+          for fmt in ("ocds.zip", "eforms.zip", "csv.zip"):
+              try:
+                  response = requests.get(base, params={"pubDay": day, "format": fmt}, timeout=120)
+                  print("\nFORMAT:", fmt, "| HTTP:", response.status_code,
+                        "| Content-Type:", response.headers.get("Content-Type"),
+                        "| Bytes:", len(response.content),
+                        "| Content-Disposition:", response.headers.get("Content-Disposition"))
+                  response.raise_for_status()
+                  if response.content.startswith(b"PK"):
+                      with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+                          names = archive.namelist()
+                          print("ZIP-Einträge:", len(names), "| Beispiele:", names[:8])
+                          if fmt == "csv.zip":
+                              csv_names = [n for n in names if n.lower().endswith(".csv")]
+                              for name in csv_names[:3]:
+                                  raw = archive.read(name)
+                                  print("CSV-Beispiel:", name, "| Bytes:", len(raw),
+                                        "| Kopf:", raw[:700].decode("utf-8-sig", errors="replace").replace("\n", " ")[:700])
+                          else:
+                              json_names = [n for n in names if n.lower().endswith(".json")]
+                              print("JSON-Dateien:", len(json_names))
+                              for name in json_names[:2]:
+                                  raw = archive.read(name)
+                                  print("Datei-Beispiel:", name, "| Bytes:", len(raw),
+                                        "| Kopf:", raw[:500].decode("utf-8-sig", errors="replace").replace("\n", " ")[:500])
+                  else:
+                      print("Antwort-Anfang:", response.text[:500].replace("\n", " "))
+              except Exception as exc:
+                  print("FEHLER:", fmt, type(exc).__name__, str(exc)[:300])
           PY
-      - name: OpenData-Filter ausführen
+      - name: Bestehenden OCDS-Filter prüfen
         run: |
           python - <<'PY'
           from national_source import fetch_national_notices
           rows, meta = fetch_national_notices()
-          print("Filter-Ergebnis:", meta)
-          print("Treffer:", len(rows))
-          for row in rows[:20]:
-              print(row["state"], row["woodpellet_check"], row["title"][:120])
+          print("OCDS-Filter:", meta, "| Treffer:", len(rows))
           PY
