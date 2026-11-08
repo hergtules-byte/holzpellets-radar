@@ -143,3 +143,53 @@ jobs:
           if stats["errors"]:
               raise SystemExit("TED-Abfragen teilweise fehlgeschlagen.")
           PY
+      - name: Gesamten Datenlauf aller drei Quellen testen (ohne Veröffentlichung)
+        env:
+          VERGABEWEISER_API_KEY: ${{ secrets.VERGABEWEISER_API_KEY }}
+        run: |
+          python update_data.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/latest.json")
+          if not path.exists():
+              raise SystemExit("Gesamtlauf hat data/latest.json nicht erzeugt.")
+
+          data = json.loads(path.read_text(encoding="utf-8"))
+          stats = data.get("statistics", {})
+          rows = data.get("results", [])
+          required = [
+              "total_results",
+              "national_source_results",
+              "ted_source_results",
+              "ted_source_queries",
+          ]
+          missing = [key for key in required if key not in stats]
+          if missing:
+              raise SystemExit(f"Statistikfelder fehlen: {missing}")
+
+          allowed_states = {
+              "Brandenburg", "Mecklenburg-Vorpommern", "Sachsen",
+              "Sachsen-Anhalt", "Thüringen"
+          }
+          invalid = [
+              row for row in rows
+              if row.get("state") not in allowed_states
+              or not row.get("id")
+              or not row.get("source")
+              or not row.get("woodpellet_check")
+          ]
+          if invalid:
+              raise SystemExit(f"{len(invalid)} Datensätze haben unvollständige Pflichtfelder.")
+
+          keys = [(row.get("source"), str(row.get("id"))) for row in rows]
+          if len(keys) != len(set(keys)):
+              raise SystemExit("Doppelte Datensatz-IDs innerhalb einer Quelle gefunden.")
+
+          print("GESAMTLAUF OK")
+          print("Datensätze:", len(rows))
+          print("Quellen:", sorted({row["source"] for row in rows}))
+          print("Statistik:", stats)
+          print("Fehler:", data.get("errors", []))
+          PY
