@@ -75,7 +75,7 @@ def _category(title, description, cpv_codes):
         return "Pellets – Holzart prüfen"
     return None
 
-def fetch_national_notices(publication_day=None):
+def fetch_national_notices(publication_day=None, include_diagnostics=False):
     """Lädt CSV-Export eines Veröffentlichungstags (Standard: Vortag)."""
     day = (
         datetime.now(ZoneInfo("Europe/Berlin")).date() - timedelta(days=1)
@@ -113,8 +113,9 @@ def fetch_national_notices(publication_day=None):
 
     found = {}
     stats = {"publication_day": day.isoformat(), "notices_in_export": len(notices),
-             "matched_keyword": 0, "matched_state": 0, "results": 0,
-             "review_candidates": []}
+             "matched_keyword": 0, "matched_state": 0, "results": 0}
+    if include_diagnostics:
+        stats["review_candidates"] = []
     for notice in notices:
         key = _join_key(notice)
         p_rows = purpose_by.get(key, [])
@@ -166,18 +167,19 @@ def fetch_national_notices(publication_day=None):
 
         category = _category(title, description, cpv_codes)
         # Auch ausgeschlossene Kandidaten für die Qualitätsprüfung sichern.
-        stats["review_candidates"].append({
-            "id": _text(notice.get("noticeIdentifier")),
-            "version": _text(notice.get("noticeVersion")),
-            "state": state,
-            "title": title,
-            "description": description,
-            "buyer": _text(buyer.get("organisationName")),
-            "place": place,
-            "cpv": sorted(set(cpv_codes)),
-            "notice_type": _text(notice.get("noticeType")),
-            "classification": category or "ausgefiltert – kein hinreichendes Brennstoffsignal",
-        })
+        if include_diagnostics:
+            stats["review_candidates"].append({
+                "id": _text(notice.get("noticeIdentifier")),
+                "version": _text(notice.get("noticeVersion")),
+                "state": state,
+                "title": title,
+                "description": description,
+                "buyer": _text(buyer.get("organisationName")),
+                "place": place,
+                "cpv": sorted(set(cpv_codes)),
+                "notice_type": _text(notice.get("noticeType")),
+                "classification": category or "ausgefiltert – kein hinreichendes Brennstoffsignal",
+            })
         if not category:
             continue
 
