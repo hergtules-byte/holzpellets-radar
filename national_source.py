@@ -44,22 +44,36 @@ def _text(value):
     return str(value or "").strip()
 
 
-def _category(text, cpv_codes):
-    t = text.lower()
-    if re.search(r"holz[\s-]*pellet|pellet[\s-]*holz|wood[\s-]*pellet", t):
-        return "Holzpellets eindeutig"
-    if any(str(code).startswith("09111400") for code in cpv_codes):
+def _category(title, description, cpv_codes):
+    """Konservative fachliche Einordnung; beiläufige Textnennungen reichen nicht."""
+    title_text = _text(title).lower()
+    description_text = _text(description).lower()
+    combined = " ".join((title_text, description_text))
+    cpv = {str(code).strip() for code in cpv_codes}
+
+    if any(code.startswith("09111400") for code in cpv):
         return "Holzbrennstoff – CPV 09111400"
-    if re.search(r"holz[\s-]*hack[\s-]*schnitzel|hackschnitzel", t):
+    if any(code.startswith("03413000") for code in cpv):
+        return "Holzhackschnitzel / Holzbrennstoff – CPV 03413000"
+
+    if re.search(r"holz[\s-]*pellet|pellet[\s-]*holz|wood[\s-]*pellet", title_text):
+        return "Holzpellets eindeutig"
+    if re.search(r"holz[\s-]*hack[\s-]*schnitzel|hackschnitzel|wood[\s-]*chips", title_text):
         return "Holzhackschnitzel – prüfen"
-    if re.search(r"holzbrennstoff|brennstoffe auf holzbasis|holzbriketts?", t):
+    if re.search(r"holzbrennstoff|brennstoffe auf holzbasis|holzbriketts?|wood[\s-]*fuel|wood[\s-]*briquette", title_text):
         return "Sonstiger Holzbrennstoff"
-    if re.search(r"\bbks\b|braunkohlestaub|braunkohle|steinkohle|\bkohle\b|briketts?", t):
-        return "BKS / Kohle / Briketts"
-    if "pellet" in t:
+    if re.search(r"\bbks\b|braunkohlestaub|braunkohle|steinkohle|\bkohle\b", title_text):
+        return "BKS / Kohle"
+    if re.search(r"briketts?\b", title_text) and re.search(r"brennstoff|heiz|liefer|holz|kohle", combined):
+        return "Briketts – Brennstoffart prüfen"
+
+    if re.search(r"\bpellets?\b", combined) and re.search(
+        r"brennstoff|heiz|wärmeversorgung|feuerung|kessel|energieversorgung|"
+        r"lieferung von pellets|pelletlieferung",
+        combined,
+    ) and not re.search(r"kunststoff|polymer|compoundier|spritzgieß|granulat", title_text):
         return "Pellets – Holzart prüfen"
     return None
-
 
 def fetch_national_notices(publication_day=None):
     """Lädt CSV-Export eines Veröffentlichungstags (Standard: Vortag)."""
@@ -149,7 +163,7 @@ def fetch_national_notices(publication_day=None):
             continue
         stats["matched_state"] += 1
 
-        category = _category(search_text, cpv_codes)
+        category = _category(title, description, cpv_codes)
         if not category:
             continue
 
