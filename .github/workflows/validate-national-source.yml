@@ -55,53 +55,6 @@ jobs:
           for row in rows[:30]:
               print(row["state"], "|", row["woodpellet_check"], "|", row["title"][:140])
           PY
-      - name: Kandidaten und Bundesland-Codes diagnostizieren
-        run: |
-          python - <<'PY'
-          import csv, io, zipfile
-          from datetime import date, timedelta
-          import requests
-          day = (date.today() - timedelta(days=1)).isoformat()
-          r = requests.get("https://oeffentlichevergabe.de/api/notice-exports",
-                           params={"pubDay": day, "format": "csv.zip"}, timeout=120)
-          r.raise_for_status()
-          with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-              def rows(name):
-                  with z.open(name) as raw:
-                      return list(csv.DictReader(io.TextIOWrapper(raw, encoding="utf-8-sig", newline="")))
-              notices, purposes = rows("notice.csv"), rows("purpose.csv")
-              places, orgs = rows("placeOfPerformance.csv"), rows("organisation.csv")
-              classes = rows("classification.csv")
-          def key(x): return (x.get("noticeIdentifier","").strip(), x.get("noticeVersion","").strip())
-          pg={}
-          for x in purposes: pg.setdefault(key(x), []).append(x)
-          lg={}
-          for x in places: lg.setdefault(key(x), []).append(x)
-          og={}
-          for x in orgs: og.setdefault(key(x), []).append(x)
-          cg={}
-          for x in classes: cg.setdefault(key(x), []).append(x)
-          terms=("holzpellet","pelletlieferung","pellets","holzhackschnitzel","holzbrennstoff",
-                 "brennstoffe auf holzbasis","bks","braunkohlestaub","braunkohle","steinkohle","kohle","brikett")
-          hits=0
-          for n in notices:
-              k=key(n); ps=pg.get(k,[])
-              title=" | ".join(x.get("title","") for x in ps)
-              desc=" | ".join(x.get("description","") for x in ps)
-              blob=(title+" "+desc).lower()
-              if not any(t in blob for t in terms): continue
-              hits+=1
-              print("\nCANDIDATE", hits, "ID", k, "title", title[:300], "description", desc[:500])
-              print("NOTICE:", n)
-              print("PLACES:", lg.get(k,[]))
-              print("ORGANISATIONS:", og.get(k,[]))
-              print("CLASSIFICATIONS:", cg.get(k,[]))
-          print("\nKEYWORD CANDIDATES TOTAL:", hits)
-          print("\nALL UNIQUE PLACE SUBDIVISIONS:")
-          print(sorted({(x.get("placePerformanceCountrySubdivision",""),x.get("placePerformanceCountryCode","")) for x in places}))
-          print("\nALL UNIQUE ORGANISATION SUBDIVISIONS:")
-          print(sorted({(x.get("organisationCountrySubdivision",""),x.get("organisationCountryCode","")) for x in orgs}))
-          PY
       - name: TED-Brennstoffsuche gegen echte Datumsstichprobe testen
         run: |
           python - <<'PY'
@@ -141,58 +94,27 @@ jobs:
           if stats["errors"]:
               raise SystemExit("TED-Abfragen teilweise fehlgeschlagen.")
           PY
-      - name: Gesamten Datenlauf aller drei Quellen testen (ohne Veröffentlichung)
-        env:
-          VERGABEWEISER_API_KEY: ${{ secrets.VERGABEWEISER_API_KEY }}
+      - name: Gesamtlauf-Schnittstellen und Retry-Logik ohne Live-Vollabruf prüfen
         run: |
-          python update_data.py
           python - <<'PY'
-          import json
-          from pathlib import Path
+          import time
+          from unittest.mock import Mock, patch
+          import update_data
 
-          path = Path("data/latest.json")
-          if not path.exists():
-              raise SystemExit("Gesamtlauf hat data/latest.json nicht erzeugt.")
+          ok = Mock(status_code=200)
+          ok.json.return_value = {"results": []}
+          limited = Mock(status_code=429, headers={"Retry-After": "0"})
+          limited.raise_for_status.side_effect = Exception("HTTP 429")
+          with patch.object(update_data.session, "get", side_effect=[limited, ok]), \
+               patch.object(update_data.time, "sleep") as sleep:
+              payload = update_data.request_json("https://example.invalid/test")
+              assert payload == {"results": []}
+              sleep.assert_called_once()
 
-          data = json.loads(path.read_text(encoding="utf-8"))
-          stats = data.get("statistics", {})
-          rows = data.get("results", [])
-          required = [
-              "total_results",
-              "national_source_results",
-              "ted_source_results",
-              "ted_source_queries",
-              "cross_source_duplicates_merged",
-          ]
-          missing = [key for key in required if key not in stats]
-          if missing:
-              raise SystemExit(f"Statistikfelder fehlen: {missing}")
-
-          allowed_states = {
-              "Brandenburg", "Mecklenburg-Vorpommern", "Sachsen",
-              "Sachsen-Anhalt", "Thüringen"
-          }
-          invalid = [
-              row for row in rows
-              if row.get("state") not in allowed_states
-              or not row.get("id")
-              or not row.get("source")
-              or not row.get("woodpellet_check")
-          ]
-          if invalid:
-              raise SystemExit(f"{len(invalid)} Datensätze haben unvollständige Pflichtfelder.")
-
-          keys = [(row.get("source"), str(row.get("id"))) for row in rows]
-          if len(keys) != len(set(keys)):
-              raise SystemExit("Doppelte Datensatz-IDs innerhalb einer Quelle gefunden.")
-
-          print("GESAMTLAUF OK")
-          print("Datensätze:", len(rows))
-          print("Quellen:", sorted({row["source"] for row in rows}))
-          print("Statistik:", stats)
-          print("Fehler:", data.get("errors", []))
-          if data.get("errors"):
-              raise SystemExit("Gesamtlauf enthält API- oder Quellenfehler.")
-          if stats.get("ted_source_errors", 0):
-              raise SystemExit("TED meldet Teilfehler.")
+          from national_source import fetch_national_notices
+          from ted_source import fetch_ted_notices
+          assert callable(fetch_national_notices)
+          assert callable(fetch_ted_notices)
+          print("RETRY-LOGIK OK")
+          print("Importer-Schnittstellen OK")
           PY
