@@ -1,0 +1,25 @@
+name: Prüfung Bekanntmachungsservice
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/bekanntmachungsservice]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python-Dateien auf Syntax prüfen
+        run: python -m compileall -q app.py update_data.py national_source.py
+      - name: Abhängigkeiten installieren
+        run: pip install requests
+      - name: OpenData-Modul importieren
+        run: python -c "import national_source; print('OpenData-Modul erfolgreich geladen')"
