@@ -73,7 +73,7 @@ jobs:
                   "statistics": stats,
                   "results": [
                       {key: row.get(key, "") for key in
-                       ("id", "state", "title", "buyer", "place", "deadline",
+                       ("id", "state", "title", "description", "buyer", "place", "deadline",
                         "published", "url", "cpv", "woodpellet_check")}
                       for row in rows
                   ],
