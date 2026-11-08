@@ -78,8 +78,13 @@ jobs:
                       for row in rows
                   ],
               }
+              entry["review_candidates"] = stats.get("review_candidates", [])
               report["days"].append(entry)
-              print(day.isoformat(), stats, "| Treffer:", len(rows))
+              print(day.isoformat(), {
+                  key: value for key, value in stats.items()
+                  if key != "review_candidates"
+              }, "| Treffer:", len(rows),
+                 "| Kandidaten zur manuellen Prüfung:", len(entry["review_candidates"]))
               for key, stat_key in (("notices", "notices_in_export"),
                                     ("keyword", "matched_keyword"),
                                     ("state", "matched_state"),
