@@ -371,8 +371,13 @@ try:
     # Bestehende Treffer nicht überschreiben; dubbele Notice-IDs vermeiden.
     existing_ids = {str(item.get("id")) for item in results.values()}
     for item in national_results:
-        if str(item.get("id")) not in existing_ids:
-            results["national-" + str(item.get("id"))] = item
+        item_id = str(item.get("id"))
+        if item_id not in existing_ids:
+            results["national-" + item_id] = item
+            existing_ids.add(item_id)
+
+    for source_error in national_stats.get("errors", []):
+        errors.append(f"Bekanntmachungsservice: {source_error}")
 
     print(
         "Bekanntmachungsservice:",
@@ -399,6 +404,9 @@ try:
     ted_results, source_stats = fetch_ted_notices(days_back=60)
     ted_stats.update(source_stats)
     ted_stats["results"] = len(ted_results)
+
+    for source_error in ted_stats.get("errors", []):
+        errors.append(f"TED: {source_error}")
 
     existing_ids = {str(item.get("id")) for item in results.values()}
     for item in ted_results:
