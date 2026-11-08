@@ -424,7 +424,54 @@ except Exception as error:
 
 
 # =====================================
-# 4. SORTIEREN
+# 5. QUELLENÜBERGREIFENDE DUBLETTEN PRÜFEN
+# =====================================
+
+import unicodedata
+
+def duplicate_key(item):
+    """Conservative fingerprint: same state, normalized title and buyer."""
+    def normalize(value):
+        value = unicodedata.normalize("NFKD", str(value or "").casefold())
+        value = "".join(ch for ch in value if not unicodedata.combining(ch))
+        value = re.sub(r"[^a-z0-9]+", " ", value)
+        return " ".join(value.split())
+
+    title = normalize(item.get("title") or item.get("original_title"))
+    buyer = normalize(item.get("buyer"))
+    state = normalize(item.get("state"))
+    # Without both a meaningful title and buyer, do not risk false merges.
+    if len(title) < 18 or not buyer or not state:
+        return None
+    return state, title, buyer
+
+deduplicated = {}
+fingerprints = {}
+duplicate_count = 0
+
+for item in results.values():
+    key = duplicate_key(item)
+    if key is None or key not in fingerprints:
+        deduplicated_key = str(item.get("source", "")) + "-" + str(item.get("id", ""))
+        deduplicated[deduplicated_key] = item
+        if key is not None:
+            fingerprints[key] = deduplicated_key
+        continue
+
+    duplicate_count += 1
+    primary = deduplicated[fingerprints[key]]
+    sources = set(primary.get("also_found_in", []))
+    sources.add(str(item.get("source", "")))
+    primary["also_found_in"] = sorted(x for x in sources if x)
+    ids = set(primary.get("source_ids", []))
+    ids.add(f"{item.get('source')}:{item.get('id')}")
+    ids.add(f"{primary.get('source')}:{primary.get('id')}")
+    primary["source_ids"] = sorted(x for x in ids if x)
+
+results = deduplicated
+
+# =====================================
+# 6. SORTIEREN
 # =====================================
 
 all_results = list(results.values())
@@ -511,6 +558,7 @@ snapshot = {
         "candidates": len(candidates),
         "detail_requests": detail_count,
         "total_results": len(all_results),
+        "cross_source_duplicates_merged": duplicate_count,
         "confirmed_woodpellets": confirmed,
         "cpv_wood_fuels": cpv_results,
         "manual_review": review,
