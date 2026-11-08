@@ -63,15 +63,15 @@ def _state_from_nuts(values):
 
 def _category(text, cpv):
     t = text.lower()
-    if re.search(r"holz[\\s-]*pellet|pellet[\\s-]*holz|wood[\\s-]*pellet", t):
+    if re.search(r"holz[\s-]*pellet|pellet[\s-]*holz|wood[\s-]*pellet", t):
         return "Holzpellets eindeutig"
     if any(str(code).startswith("09111400") for code in cpv):
         return "Holzbrennstoff – CPV 09111400"
-    if re.search(r"holz[\\s-]*hack[\\s-]*schnitzel|wood[\\s-]*chips|hackschnitzel", t):
+    if re.search(r"holz[\s-]*hack[\s-]*schnitzel|wood[\s-]*chips|hackschnitzel", t):
         return "Holzhackschnitzel – prüfen"
-    if re.search(r"holzbrikett|wood[\\s-]*briquette|holzbrennstoff|wood[\\s-]*fuel", t):
+    if re.search(r"holzbrikett|wood[\s-]*briquette|holzbrennstoff|wood[\s-]*fuel", t):
         return "Sonstiger Holzbrennstoff"
-    if re.search(r"\\bbks\\b|braunkohle|steinkohle|\\bkohle\\b", t):
+    if re.search(r"\bbks\b|braunkohle|steinkohle|\bkohle\b", t):
         return "BKS / Kohle / Briketts"
     if "pellet" in t:
         return "Pellets – Holzart prüfen"
