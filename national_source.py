@@ -10,17 +10,19 @@ from zoneinfo import ZoneInfo
 import requests
 
 API_URL = "https://oeffentlichevergabe.de/api/notice-exports"
-STATE_CODES = {
-    "DE40": "Brandenburg",
-    "DE80": "Mecklenburg-Vorpommern",
-    "DED2": "Sachsen",
-    "DEE0": "Sachsen-Anhalt",
-    "DEG0": "Thüringen",
+STATE_PREFIXES = {
+    "DE4": "Brandenburg",
+    "DE8": "Mecklenburg-Vorpommern",
+    "DED": "Sachsen",
+    "DEE": "Sachsen-Anhalt",
+    "DEG": "Thüringen",
 }
-SEARCH_TERMS = (
-    "holzpellet", "pelletlieferung", "pellets", "holzhackschnitzel",
-    "holzbrennstoff", "brennstoffe auf holzbasis", "bks",
-    "braunkohlestaub", "braunkohle", "steinkohle", "kohle", "brikett",
+SEARCH_PATTERN = re.compile(
+    r"holz[\\s-]*pellet(?:s)?|pelletlieferung|pellets?\\b|"
+    r"holzhack(?:schnitzel)?|hackschnitzel|holzbrennstoff|"
+    r"brennstoffe auf holzbasis|\\bbks\\b|braunkohlestaub|"
+    r"braunkohle|steinkohle|\\bkohle\\b|briketts?\\b",
+    re.IGNORECASE,
 )
 
 
@@ -115,7 +117,7 @@ def fetch_national_notices():
                 ).split(",") if x.strip())
 
         search_text = " ".join((title, description, _text(notice.get("noticeType"))))
-        if not any(term in search_text.lower() for term in SEARCH_TERMS):
+        if not SEARCH_PATTERN.search(search_text):
             continue
         stats["matched_keyword"] += 1
 
@@ -123,8 +125,9 @@ def fetch_national_notices():
         place = ""
         for row in pl_rows:
             code = _text(row.get("placePerformanceCountrySubdivision")).upper()
-            if code in STATE_CODES:
-                state = STATE_CODES[code]
+            state = next((name for prefix, name in STATE_PREFIXES.items()
+                          if code.startswith(prefix)), None)
+            if state:
                 place = " ".join(filter(None, (
                     _text(row.get("placePerformancePostCode")),
                     _text(row.get("placePerformanceCity")),
@@ -133,8 +136,9 @@ def fetch_national_notices():
         if not state:
             for row in o_rows:
                 code = _text(row.get("organisationCountrySubdivision")).upper()
-                if code in STATE_CODES:
-                    state = STATE_CODES[code]
+                state = next((name for prefix, name in STATE_PREFIXES.items()
+                              if code.startswith(prefix)), None)
+                if state:
                     place = _text(row.get("organisationCity"))
                     break
         if not state:
