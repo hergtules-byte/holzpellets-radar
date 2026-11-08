@@ -94,6 +94,81 @@ jobs:
           if stats["errors"]:
               raise SystemExit("TED-Abfragen teilweise fehlgeschlagen.")
           PY
+      - name: Vergabeweiser mit fünf begrenzten Suchanfragen prüfen
+        env:
+          VERGABEWEISER_API_KEY: ${{ secrets.VERGABEWEISER_API_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          import time
+          import requests
+
+          api_key = os.environ.get("VERGABEWEISER_API_KEY")
+          if not api_key:
+              raise SystemExit("GitHub Secret VERGABEWEISER_API_KEY fehlt.")
+
+          states = {
+              "Brandenburg": "brandenburg",
+              "Mecklenburg-Vorpommern": "mecklenburg-vorpommern",
+              "Sachsen": "sachsen",
+              "Sachsen-Anhalt": "sachsen-anhalt",
+              "Thüringen": "thueringen",
+          }
+          session = requests.Session()
+          session.headers.update({
+              "Authorization": f"Bearer {api_key}",
+              "User-Agent": "Holzpellets-Radar/4.0",
+              "Accept": "application/json",
+          })
+
+          failures = []
+          total = 0
+          for state, slug in states.items():
+              params = {
+                  "was": "Holzpellets",
+                  "land": slug,
+                  "status": "offen",
+                  "sort": "neu",
+                  "seite": 1,
+              }
+              response = None
+              for attempt in range(4):
+                  try:
+                      response = session.get(
+                          "https://vergabeweiser.de/api/v1/tenders",
+                          params=params,
+                          timeout=30,
+                      )
+                      if response.status_code == 429 or response.status_code in (500, 502, 503, 504):
+                          if attempt == 3:
+                              response.raise_for_status()
+                          retry_after = response.headers.get("Retry-After", "")
+                          try:
+                              delay = float(retry_after)
+                          except (TypeError, ValueError):
+                              delay = min(2 ** attempt, 15)
+                          delay = max(1, min(delay, 30))
+                          print(f"{state}: HTTP {response.status_code}; Wiederholung in {delay:g}s")
+                          time.sleep(delay)
+                          continue
+                      response.raise_for_status()
+                      payload = response.json()
+                      rows = payload.get("results", [])
+                      total += len(rows)
+                      print(f"{state}: HTTP {response.status_code}; Ergebnisse={len(rows)}; Gesamt={payload.get('total', 'unbekannt')}")
+                      break
+                  except Exception as exc:
+                      if attempt == 3:
+                          failures.append(f"{state}: {exc}")
+                          print(f"{state}: FEHLER nach 4 Versuchen: {exc}")
+                      else:
+                          time.sleep(min(2 ** attempt, 15))
+              time.sleep(1)
+
+          print(f"VERGABEWEISER-STICHPROBE: {len(states)} Anfragen; {total} Einträge; Fehler={len(failures)}")
+          if failures:
+              raise SystemExit("\\n".join(failures))
+          PY
       - name: Importer-Schnittstellen ohne Live-Vollabruf prüfen
         run: |
           python - <<'PY'
