@@ -44,7 +44,7 @@ SEARCH_TERMS = [
 
 MAX_PAGES = 2
 MAX_DETAIL_REQUESTS = 500
-PAUSE = 0.25
+PAUSE = 1.0
 
 CPV_WOOD_FUEL = "09111400"
 
@@ -101,14 +101,26 @@ def get_value(value, *keys):
     return ""
 
 
-def request_json(url, params=None):
-    response = session.get(
-        url,
-        params=params,
-        timeout=45
-    )
-    response.raise_for_status()
-    return response.json()
+def request_json(url, params=None, max_retries=4):
+    """Request JSON with bounded backoff for rate limits and transient server errors."""
+    for attempt in range(max_retries + 1):
+        response = session.get(
+            url,
+            params=params,
+            timeout=45
+        )
+        if response.status_code == 429 or response.status_code in (500, 502, 503, 504):
+            if attempt >= max_retries:
+                response.raise_for_status()
+            retry_after = response.headers.get("Retry-After", "")
+            try:
+                wait_seconds = float(retry_after)
+            except (TypeError, ValueError):
+                wait_seconds = min(2 ** attempt, 30)
+            time.sleep(max(1, min(wait_seconds, 60)))
+            continue
+        response.raise_for_status()
+        return response.json()
 
 
 def classify(item, detail):
