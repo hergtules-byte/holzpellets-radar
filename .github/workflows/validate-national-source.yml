@@ -104,22 +104,28 @@ jobs:
           print("\nALL UNIQUE ORGANISATION SUBDIVISIONS:")
           print(sorted({(x.get("organisationCountrySubdivision",""),x.get("organisationCountryCode","")) for x in orgs}))
           PY
-      - name: TED API-Verbindung und Suchschema testen
+      - name: TED API-Suchbegriffe und Felder validieren
         run: |
           python - <<'PY'
-          import requests, json
+          import requests
           url = "https://api.ted.europa.eu/v3/notices/search"
-          body = {
-              "query": 'FT=(holzpellets OR pellets OR holzhackschnitzel)',
-              "fields": ["publication-number", "publication-date", "BT-01-notice", "organisation-name-buyer", "place-of-performance", "description-glo"],
-              "limit": 5,
-              "page": 1,
-              "scope": "ALL",
-              "checkQuerySyntax": True
-          }
-          r = requests.post(url, json=body, timeout=90)
-          print("HTTP:", r.status_code)
-          print("Content-Type:", r.headers.get("Content-Type"))
-          print("Response:", r.text[:6000])
-          r.raise_for_status()
+          queries = [
+              'FT~"holzpellets"',
+              'FT~"pellets"',
+              'FT~"wood pellets"',
+              'FT~"Holzhackschnitzel"',
+              'PD>=20261101',
+          ]
+          fields = ["publication-number", "publication-date", "notice-title",
+                    "publication-date", "place-of-performance", "description-glo"]
+          for query in queries:
+              body = {"query": query, "fields": fields, "limit": 5,
+                      "page": 1, "scope": "ALL", "checkQuerySyntax": True}
+              r = requests.post(url, json=body, timeout=90)
+              print("\\nQUERY:", query, "| HTTP:", r.status_code)
+              print("RESPONSE:", r.text[:2500])
+              r.raise_for_status()
+              data = r.json()
+              print("COUNT:", data.get("totalNoticeCount"),
+                    "| RECORDS:", len(data.get("notices", [])))
           PY
