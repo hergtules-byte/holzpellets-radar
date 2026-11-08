@@ -18,10 +18,10 @@ STATE_PREFIXES = {
     "DEG": "Thüringen",
 }
 SEARCH_PATTERN = re.compile(
-    r"holz[\\s-]*pellet(?:s)?|pelletlieferung|pellets?\\b|"
+    r"holz[\s-]*pellet(?:s)?|pelletlieferung|pellets?\b|"
     r"holzhack(?:schnitzel)?|hackschnitzel|holzbrennstoff|"
-    r"brennstoffe auf holzbasis|\\bbks\\b|braunkohlestaub|"
-    r"braunkohle|steinkohle|\\bkohle\\b|briketts?\\b",
+    r"brennstoffe auf holzbasis|\bbks\b|braunkohlestaub|"
+    r"braunkohle|steinkohle|\bkohle\b|briketts?\b",
     re.IGNORECASE,
 )
 
