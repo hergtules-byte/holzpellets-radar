@@ -1,0 +1,152 @@
+name: Prüfung Bekanntmachungsservice
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python-Dateien auf Syntax prüfen
+        run: python -m compileall -q app.py update_data.py national_source.py ted_source.py vergabeweiser_client.py tests
+      - name: Abhängigkeiten installieren
+        run: pip install requests
+      - name: Vergabeweiser-429-Sperrlogik mit simulierten Antworten testen
+        run: python -m unittest discover -s tests -v
+      - name: CSV-Tabellenstruktur auslesen
+        run: |
+          python - <<'PY'
+          import csv, io, zipfile
+          from datetime import date, timedelta
+          import requests
+          day = (date.today() - timedelta(days=1)).isoformat()
+          response = requests.get("https://oeffentlichevergabe.de/api/notice-exports",
+                                  params={"pubDay": day, "format": "csv.zip"}, timeout=120)
+          response.raise_for_status()
+          with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+              for name in z.namelist():
+                  if not name.lower().endswith(".csv"):
+                      continue
+                  with z.open(name) as raw:
+                      text = io.TextIOWrapper(raw, encoding="utf-8-sig", newline="")
+                      reader = csv.DictReader(text)
+                      rows = list(reader)
+                  print("\nTABLE:", name, "| ROWS:", len(rows))
+                  print("COLUMNS:", reader.fieldnames)
+                  if name in ("notice.csv", "organisation.csv", "purpose.csv",
+                              "classification.csv", "placeOfPerformance.csv",
+                              "procedure.csv", "lot.csv", "tender.csv"):
+                      for row in rows[:2]:
+                          print("SAMPLE:", {k:v for k,v in row.items() if v})
+          PY
+      - name: CSV-Importer live testen
+        run: |
+          python - <<'PY'
+          from national_source import fetch_national_notices
+          rows, stats = fetch_national_notices()
+          print("Exportstatistik:", stats)
+          print("Treffer:", len(rows))
+          for row in rows[:30]:
+              print(row["state"], "|", row["woodpellet_check"], "|", row["title"][:140])
+          PY
+      - name: Bekanntmachungsservice über 30 Veröffentlichungstage auswerten
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date, timedelta
+          from national_source import fetch_national_notices
+          totals = {"notices": 0, "keyword": 0, "state": 0, "results": 0}
+          report = {"days": [], "totals": totals}
+          for offset in range(1, 31):
+              day = date.today() - timedelta(days=offset)
+              rows, stats = fetch_national_notices(publication_day=day.isoformat(), include_diagnostics=True)
+              entry = {
+                  "date": day.isoformat(),
+                  "statistics": stats,
+                  "results": [
+                      {key: row.get(key, "") for key in
+                       ("id", "state", "title", "description", "buyer", "place", "deadline",
+                        "published", "url", "cpv", "woodpellet_check")}
+                      for row in rows
+                  ],
+              }
+              entry["review_candidates"] = stats.get("review_candidates", [])
+              report["days"].append(entry)
+              print(day.isoformat(), {
+                  key: value for key, value in stats.items()
+                  if key != "review_candidates"
+              }, "| Treffer:", len(rows),
+                 "| Kandidaten zur manuellen Prüfung:", len(entry["review_candidates"]))
+              for key, stat_key in (("notices", "notices_in_export"),
+                                    ("keyword", "matched_keyword"),
+                                    ("state", "matched_state"),
+                                    ("results", "results")):
+                  totals[key] += stats.get(stat_key, 0)
+          print("30-Tage-Gesamtauswertung:", totals)
+          with open("national_source_quality.json", "w", encoding="utf-8") as output:
+              json.dump(report, output, ensure_ascii=False, indent=2)
+          PY
+      - name: 30-Tage-Trefferbericht als Artefakt speichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: national-source-quality-30-day-report
+          path: national_source_quality.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: TED-Brennstoffsuche gegen echte Datumsstichprobe testen
+        run: |
+          python - <<'PY'
+          import requests
+          url = "https://api.ted.europa.eu/v3/notices/search"
+          queries = [
+              "publication-date=20261102 AND FT~(\"pellets\")",
+              "publication-date=20261102 AND FT~(\"holzpellets\")",
+              "publication-date=20261102 AND FT~(\"wood pellets\")",
+              "publication-date=20261102 AND buyer-country=DEU",
+              "publication-date=20261102 AND classification-cpv=09111400",
+          ]
+          fields = ["publication-number", "publication-date", "notice-title",
+                    "buyer-name", "buyer-country", "classification-cpv",
+                    "place-of-performance", "deadline-receipt-tender-date-lot"]
+          for query in queries:
+              body = {"query": query, "fields": fields, "page": 1, "limit": 10,
+                      "paginationMode": "PAGE_NUMBER", "scope": "ALL"}
+              r = requests.post(url, json=body, timeout=90)
+              print("\\nQUERY:", query, "| HTTP:", r.status_code)
+              print("RESPONSE:", r.text[:3500])
+              r.raise_for_status()
+              data = r.json()
+              print("COUNT:", data.get("totalNoticeCount"),
+                    "| RECORDS:", len(data.get("notices", [])),
+                    "| TIMED OUT:", data.get("timedOut"))
+          PY
+      - name: TED-Importer live testen
+        run: |
+          python - <<'PY'
+          from ted_source import fetch_ted_notices
+          rows, stats = fetch_ted_notices(days_back=60)
+          print("TED-Statistik:", stats)
+          print("TED-Treffer in Zielbundesländern:", len(rows))
+          for row in rows[:30]:
+              print(row["state"], "|", row["woodpellet_check"], "|", row["title"][:140], "|", row["url"])
+          if stats["errors"]:
+              raise SystemExit("TED-Abfragen teilweise fehlgeschlagen.")
+          PY
+      - name: Importer-Schnittstellen ohne Live-Vollabruf prüfen
+        if: always()
+        run: |
+          python - <<'PY'
+          from national_source import fetch_national_notices
+          from ted_source import fetch_ted_notices
+          assert callable(fetch_national_notices)
+          assert callable(fetch_ted_notices)
+          print("Importer-Schnittstellen OK")
+          PY

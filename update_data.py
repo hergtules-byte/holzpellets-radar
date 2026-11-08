@@ -4,10 +4,11 @@ import re
 import json
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import requests
+from vergabeweiser_client import VergabeweiserClient, VergabeweiserRateLimited
 
 # =====================================
 # KONFIGURATION
@@ -15,6 +16,7 @@ import requests
 
 API = "https://vergabeweiser.de/api/v1"
 DATA_FILE = Path("data/latest.json")
+VERGABEWEISER_PAUSE_FILE = Path("data/vergabeweiser_pause.json")
 
 STATES = {
     "Brandenburg": "brandenburg",
@@ -44,7 +46,7 @@ SEARCH_TERMS = [
 
 MAX_PAGES = 2
 MAX_DETAIL_REQUESTS = 500
-PAUSE = 0.25
+PAUSE = 1.0
 
 CPV_WOOD_FUEL = "09111400"
 
@@ -101,14 +103,12 @@ def get_value(value, *keys):
     return ""
 
 
-def request_json(url, params=None):
-    response = session.get(
-        url,
-        params=params,
-        timeout=45
-    )
-    response.raise_for_status()
-    return response.json()
+vergabeweiser_client = VergabeweiserClient(
+    session=session,
+    pause_file=VERGABEWEISER_PAUSE_FILE,
+    data_file=DATA_FILE,
+)
+vergabeweiser_paused_until = vergabeweiser_client.paused_until
 
 
 def classify(item, detail):
@@ -188,16 +188,23 @@ print("HOLZPELLETS-RADAR 4.0")
 print("Suche in fünf Bundesländern")
 print("--------------------------------")
 
-for state, slug in STATES.items():
+if vergabeweiser_paused_until:
+    message = f"Vergabeweiser wegen HTTP 429 bis {vergabeweiser_paused_until.isoformat()} pausiert; andere Quellen laufen weiter."
+    print(message)
+    errors.append(message)
+else:
+  for state, slug in STATES.items():
 
     for term in SEARCH_TERMS:
 
+        if vergabeweiser_paused_until:
+            break
         print(f"Suche: {state} – {term}")
 
         for page in range(1, MAX_PAGES + 1):
 
             try:
-                data = request_json(
+                data = vergabeweiser_client.request_json(
                     f"{API}/tenders",
                     params={
                         "was": term,
@@ -237,11 +244,17 @@ for state, slug in STATES.items():
                                 "term": term
                             }
 
+                # Pace every search request, including the last page of each term.
+                time.sleep(PAUSE)
+
                 if page >= data.get("pages", 1):
                     break
 
-                time.sleep(PAUSE)
-
+            except VergabeweiserRateLimited as error:
+                vergabeweiser_paused_until = vergabeweiser_client.paused_until
+                errors.append(str(error))
+                print("Vergabeweiser pausiert:", error)
+                break
             except Exception as error:
                 errors.append(
                     f"{state} / {term}: {error}"
@@ -261,6 +274,10 @@ detail_count = 0
 
 for tender_id, candidate in candidates.items():
 
+    if vergabeweiser_paused_until:
+        print("Detailabrufe übersprungen: Vergabeweiser ist rate-limited.")
+        break
+
     if detail_count >= MAX_DETAIL_REQUESTS:
         errors.append(
             "Maximale Zahl der Detailabrufe erreicht."
@@ -272,7 +289,7 @@ for tender_id, candidate in candidates.items():
     term = candidate["term"]
 
     try:
-        detail = request_json(
+        detail = vergabeweiser_client.request_json(
             f"{API}/tenders/{tender_id}"
         )
 
@@ -346,6 +363,11 @@ for tender_id, candidate in candidates.items():
             result["title"]
         )
 
+    except VergabeweiserRateLimited as error:
+        vergabeweiser_paused_until = vergabeweiser_client.paused_until
+        errors.append(str(error))
+        print("Vergabeweiser pausiert:", error)
+        break
     except Exception as error:
         errors.append(
             f"Detail {tender_id}: {error}"
@@ -356,7 +378,122 @@ for tender_id, candidate in candidates.items():
 
 
 # =====================================
-# 3. SORTIEREN
+# 3. OFFIZIELLER BEKANNTMACHUNGSSERVICE
+# =====================================
+
+national_stats = {"results": 0, "publication_day": None, "errors": []}
+
+try:
+    from national_source import fetch_national_notices
+
+    national_results, source_stats = fetch_national_notices()
+    national_stats.update(source_stats)
+    national_stats["results"] = len(national_results)
+
+    # Bestehende Treffer nicht überschreiben; dubbele Notice-IDs vermeiden.
+    existing_ids = {str(item.get("id")) for item in results.values()}
+    for item in national_results:
+        item_id = str(item.get("id"))
+        if item_id not in existing_ids:
+            results["national-" + item_id] = item
+            existing_ids.add(item_id)
+
+    for source_error in national_stats.get("errors", []):
+        errors.append(f"Bekanntmachungsservice: {source_error}")
+
+    print(
+        "Bekanntmachungsservice:",
+        len(national_results),
+        "passende Treffer für",
+        national_stats["publication_day"]
+    )
+except Exception as error:
+    message = f"Bekanntmachungsservice: {error}"
+    national_stats["errors"].append(message)
+    errors.append(message)
+    print("Fehler beim Bekanntmachungsservice:", error)
+
+
+# =====================================
+# 4. TED ALS ZUSÄTZLICHE DATENQUELLE
+# =====================================
+
+ted_stats = {"results": 0, "errors": []}
+
+try:
+    from ted_source import fetch_ted_notices
+
+    ted_results, source_stats = fetch_ted_notices(days_back=60)
+    ted_stats.update(source_stats)
+    ted_stats["results"] = len(ted_results)
+
+    for source_error in ted_stats.get("errors", []):
+        errors.append(f"TED: {source_error}")
+
+    existing_ids = {str(item.get("id")) for item in results.values()}
+    for item in ted_results:
+        item_id = str(item.get("id"))
+        if item_id not in existing_ids:
+            results["ted-" + item_id] = item
+            existing_ids.add(item_id)
+
+    print("TED:", len(ted_results), "passende Treffer")
+except Exception as error:
+    message = f"TED: {error}"
+    ted_stats["errors"].append(message)
+    errors.append(message)
+    print("Fehler bei TED:", error)
+
+
+# =====================================
+# 5. QUELLENÜBERGREIFENDE DUBLETTEN PRÜFEN
+# =====================================
+
+import unicodedata
+
+def duplicate_key(item):
+    """Conservative fingerprint: same state, normalized title and buyer."""
+    def normalize(value):
+        value = unicodedata.normalize("NFKD", str(value or "").casefold())
+        value = "".join(ch for ch in value if not unicodedata.combining(ch))
+        value = re.sub(r"[^a-z0-9]+", " ", value)
+        return " ".join(value.split())
+
+    title = normalize(item.get("title") or item.get("original_title"))
+    buyer = normalize(item.get("buyer"))
+    state = normalize(item.get("state"))
+    # Without both a meaningful title and buyer, do not risk false merges.
+    if len(title) < 18 or not buyer or not state:
+        return None
+    return state, title, buyer
+
+deduplicated = {}
+fingerprints = {}
+duplicate_count = 0
+
+for item in results.values():
+    key = duplicate_key(item)
+    if key is None or key not in fingerprints:
+        deduplicated_key = str(item.get("source", "")) + "-" + str(item.get("id", ""))
+        deduplicated[deduplicated_key] = item
+        if key is not None:
+            fingerprints[key] = deduplicated_key
+        continue
+
+    duplicate_count += 1
+    primary = deduplicated[fingerprints[key]]
+    sources = set(primary.get("also_found_in", []))
+    sources.add(str(item.get("source", "")))
+    primary["also_found_in"] = sorted(x for x in sources if x)
+    ids = set(primary.get("source_ids", []))
+    ids.add(f"{item.get('source')}:{item.get('id')}")
+    ids.add(f"{primary.get('source')}:{primary.get('id')}")
+    primary["source_ids"] = sorted(x for x in ids if x)
+
+results = deduplicated
+
+# =====================================
+# 6. SORTIEREN
 # =====================================
 
 all_results = list(results.values())
@@ -443,11 +580,23 @@ snapshot = {
         "candidates": len(candidates),
         "detail_requests": detail_count,
         "total_results": len(all_results),
+        "cross_source_duplicates_merged": duplicate_count,
         "confirmed_woodpellets": confirmed,
         "cpv_wood_fuels": cpv_results,
         "manual_review": review,
         "other_fuels_bks_coal_briquettes": other_fuels,
-        "errors": len(errors)
+        "errors": len(errors),
+        "national_source_results": national_stats["results"],
+        "national_source_publication_day": national_stats["publication_day"],
+        "ted_source_results": ted_stats["results"],
+        "ted_source_since": ted_stats.get("since"),
+        "ted_source_queries": ted_stats.get("queries", 0),
+        "ted_source_raw_notices": ted_stats.get("raw_notices", 0),
+        "ted_source_errors": len(ted_stats.get("errors", [])),
+        "vergabeweiser_paused_until": (
+            vergabeweiser_paused_until.isoformat()
+            if vergabeweiser_paused_until else None
+        )
     }
 }
 
