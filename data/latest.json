@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-08T19:28:55+01:00",
+  "updated_at": "2026-11-08T19:31:57+01:00",
   "results": [
     {
       "id": "4eb11e96",
@@ -101,6 +101,34 @@
       "received": 9
     },
     {
+      "state": "Brandenburg",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
       "state": "Mecklenburg-Vorpommern",
       "term": "Holzpellets",
       "page": 1,
@@ -155,6 +183,34 @@
       "page": 1,
       "total": 4,
       "received": 4
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
     },
     {
       "state": "Sachsen",
@@ -213,6 +269,34 @@
       "received": 7
     },
     {
+      "state": "Sachsen",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
       "state": "Sachsen-Anhalt",
       "term": "Holzpellets",
       "page": 1,
@@ -267,6 +351,34 @@
       "page": 1,
       "total": 2,
       "received": 2
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
     },
     {
       "state": "Thüringen",
@@ -323,18 +435,47 @@
       "page": 1,
       "total": 6,
       "received": 6
+    },
+    {
+      "state": "Thüringen",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
     }
   ],
   "statistics": {
     "states": 5,
-    "search_terms": 8,
-    "search_requests": 40,
+    "search_terms": 12,
+    "search_requests": 60,
     "candidates": 52,
     "detail_requests": 52,
     "total_results": 2,
     "confirmed_woodpellets": 0,
     "cpv_wood_fuels": 0,
     "manual_review": 2,
+    "other_fuels_bks_coal_briquettes": 0,
     "errors": 0
   }
 }
