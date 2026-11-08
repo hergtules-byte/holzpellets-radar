@@ -16,9 +16,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Python-Dateien auf Syntax prüfen
-        run: python -m compileall -q app.py update_data.py national_source.py ted_source.py
+        run: python -m compileall -q app.py update_data.py national_source.py ted_source.py vergabeweiser_client.py tests
       - name: Abhängigkeiten installieren
         run: pip install requests
+      - name: Vergabeweiser-429-Sperrlogik mit simulierten Antworten testen
+        run: python -m unittest discover -s tests -v
       - name: CSV-Tabellenstruktur auslesen
         run: |
           python - <<'PY'
