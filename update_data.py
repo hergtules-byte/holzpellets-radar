@@ -34,7 +34,12 @@ SEARCH_TERMS = [
     "Holzhackschnitzel",
     "Holzbrennstoffe",
     "Brennstoffe auf Holzbasis",
-    "Holz"
+    "Holz",
+    # Zusätzliche Brennstoff-Suchbegriffe (getrennt von Holzpellets ausgewertet)
+    "BKS",
+    "Braunkohlestaub",
+    "Kohle",
+    "Briketts"
 ]
 
 MAX_PAGES = 2
@@ -159,7 +164,16 @@ def classify(item, detail):
     ):
         return "Sonstiger Holzbrennstoff", combined
 
-    # 5. Allgemeine Pellets
+    # 5. Fossile bzw. sonstige Brennstoffe separat erfassen.
+    # Holzbriketts wurden oben bereits als Holzbrennstoff eingeordnet.
+    if re.search(
+        r"\\bbks\\b|braunkohlestaub|braunkohle|steinkohle|"
+        r"\\bkohle\\b|briketts?",
+        full_text
+    ):
+        return "BKS / Kohle / Briketts", combined
+
+    # 6. Allgemeine Pellets
     if "pellet" in full_text:
         return "Pellets – Holzart prüfen", combined
 
@@ -396,6 +410,11 @@ review = sum(
     ]
 )
 
+other_fuels = sum(
+    1 for r in all_results
+    if r["woodpellet_check"] == "BKS / Kohle / Briketts"
+)
+
 
 # =====================================
 # 6. SPEICHERN
@@ -427,6 +446,7 @@ snapshot = {
         "confirmed_woodpellets": confirmed,
         "cpv_wood_fuels": cpv_results,
         "manual_review": review,
+        "other_fuels_bks_coal_briquettes": other_fuels,
         "errors": len(errors)
     }
 }
