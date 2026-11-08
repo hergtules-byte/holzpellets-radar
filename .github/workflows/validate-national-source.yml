@@ -191,4 +191,8 @@ jobs:
           print("Quellen:", sorted({row["source"] for row in rows}))
           print("Statistik:", stats)
           print("Fehler:", data.get("errors", []))
+          if data.get("errors"):
+              raise SystemExit("Gesamtlauf enthält API- oder Quellenfehler.")
+          if stats.get("ted_source_errors", 0):
+              raise SystemExit("TED meldet Teilfehler.")
           PY
