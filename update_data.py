@@ -5,10 +5,10 @@ import json
 import time
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from email.utils import parsedate_to_datetime
 from zoneinfo import ZoneInfo
 
 import requests
+from vergabeweiser_client import VergabeweiserClient, VergabeweiserRateLimited
 
 # =====================================
 # KONFIGURATION
@@ -103,78 +103,12 @@ def get_value(value, *keys):
     return ""
 
 
-def read_vergabeweiser_pause():
-    try:
-        payload = json.loads(VERGABEWEISER_PAUSE_FILE.read_text(encoding="utf-8"))
-        until = datetime.fromisoformat(payload["paused_until"])
-        if until.tzinfo is None:
-            until = until.replace(tzinfo=timezone.utc)
-        if until > datetime.now(timezone.utc):
-            return until
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    try:
-        snapshot = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-        saved = snapshot.get("statistics", {}).get("vergabeweiser_paused_until")
-        if saved:
-            until = datetime.fromisoformat(saved)
-            if until.tzinfo is None:
-                until = until.replace(tzinfo=timezone.utc)
-            if until > datetime.now(timezone.utc):
-                return until
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    return None
-
-
-vergabeweiser_paused_until = read_vergabeweiser_pause()
-
-
-def save_vergabeweiser_pause(response):
-    retry_after = response.headers.get("Retry-After", "").strip()
-    now = datetime.now(timezone.utc)
-    try:
-        until = now + timedelta(seconds=max(1, int(float(retry_after))))
-    except (TypeError, ValueError, OverflowError):
-        try:
-            until = parsedate_to_datetime(retry_after).astimezone(timezone.utc)
-        except (TypeError, ValueError, OverflowError):
-            until = now + timedelta(hours=1)
-    if until <= now:
-        until = now + timedelta(minutes=1)
-    VERGABEWEISER_PAUSE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    VERGABEWEISER_PAUSE_FILE.write_text(
-        json.dumps({"paused_until": until.isoformat(), "reason": "HTTP 429"}, indent=2),
-        encoding="utf-8"
-    )
-    return until
-
-
-class VergabeweiserRateLimited(Exception):
-    pass
-
-
-def request_json(url, params=None, max_retries=4):
-    """Persist HTTP 429 cooldown and stop further calls to this provider."""
-    global vergabeweiser_paused_until
-    if vergabeweiser_paused_until and vergabeweiser_paused_until > datetime.now(timezone.utc):
-        raise VergabeweiserRateLimited(
-            f"Vergabeweiser pausiert bis {vergabeweiser_paused_until.isoformat()}"
-        )
-    for attempt in range(max_retries + 1):
-        response = session.get(url, params=params, timeout=45)
-        if response.status_code == 429:
-            vergabeweiser_paused_until = save_vergabeweiser_pause(response)
-            raise VergabeweiserRateLimited(
-                f"HTTP 429; Vergabeweiser pausiert bis {vergabeweiser_paused_until.isoformat()}"
-            )
-        if response.status_code in (500, 502, 503, 504):
-            if attempt >= max_retries:
-                response.raise_for_status()
-            time.sleep(min(2 ** attempt, 30))
-            continue
-        response.raise_for_status()
-        return response.json()
+vergabeweiser_client = VergabeweiserClient(
+    session=session,
+    pause_file=VERGABEWEISER_PAUSE_FILE,
+    data_file=DATA_FILE,
+)
+vergabeweiser_paused_until = vergabeweiser_client.paused_until
 
 
 def classify(item, detail):
@@ -270,7 +204,7 @@ else:
         for page in range(1, MAX_PAGES + 1):
 
             try:
-                data = request_json(
+                data = vergabeweiser_client.request_json(
                     f"{API}/tenders",
                     params={
                         "was": term,
@@ -317,6 +251,7 @@ else:
                     break
 
             except VergabeweiserRateLimited as error:
+                vergabeweiser_paused_until = vergabeweiser_client.paused_until
                 errors.append(str(error))
                 print("Vergabeweiser pausiert:", error)
                 break
@@ -354,7 +289,7 @@ for tender_id, candidate in candidates.items():
     term = candidate["term"]
 
     try:
-        detail = request_json(
+        detail = vergabeweiser_client.request_json(
             f"{API}/tenders/{tender_id}"
         )
 
@@ -429,6 +364,7 @@ for tender_id, candidate in candidates.items():
         )
 
     except VergabeweiserRateLimited as error:
+        vergabeweiser_paused_until = vergabeweiser_client.paused_until
         errors.append(str(error))
         print("Vergabeweiser pausiert:", error)
         break
