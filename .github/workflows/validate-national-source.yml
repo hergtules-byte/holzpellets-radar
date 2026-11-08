@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Python-Dateien auf Syntax prüfen
-        run: python -m compileall -q app.py update_data.py national_source.py
+        run: python -m compileall -q app.py update_data.py national_source.py ted_source.py
       - name: Abhängigkeiten installieren
         run: pip install requests
       - name: CSV-Tabellenstruktur auslesen
@@ -130,4 +130,16 @@ jobs:
               print("COUNT:", data.get("totalNoticeCount"),
                     "| RECORDS:", len(data.get("notices", [])),
                     "| TIMED OUT:", data.get("timedOut"))
+          PY
+      - name: TED-Importer live testen
+        run: |
+          python - <<'PY'
+          from ted_source import fetch_ted_notices
+          rows, stats = fetch_ted_notices(days_back=60)
+          print("TED-Statistik:", stats)
+          print("TED-Treffer in Zielbundesländern:", len(rows))
+          for row in rows[:30]:
+              print(row["state"], "|", row["woodpellet_check"], "|", row["title"][:140], "|", row["url"])
+          if stats["errors"]:
+              raise SystemExit("TED-Abfragen teilweise fehlgeschlagen.")
           PY
