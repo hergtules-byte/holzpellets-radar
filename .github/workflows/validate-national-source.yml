@@ -57,3 +57,50 @@ jobs:
           for row in rows[:30]:
               print(row["state"], "|", row["woodpellet_check"], "|", row["title"][:140])
           PY
+      - name: Kandidaten und Bundesland-Codes diagnostizieren
+        run: |
+          python - <<'PY'
+          import csv, io, zipfile
+          from datetime import date, timedelta
+          import requests
+          day = (date.today() - timedelta(days=1)).isoformat()
+          r = requests.get("https://oeffentlichevergabe.de/api/notice-exports",
+                           params={"pubDay": day, "format": "csv.zip"}, timeout=120)
+          r.raise_for_status()
+          with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+              def rows(name):
+                  with z.open(name) as raw:
+                      return list(csv.DictReader(io.TextIOWrapper(raw, encoding="utf-8-sig", newline="")))
+              notices, purposes = rows("notice.csv"), rows("purpose.csv")
+              places, orgs = rows("placeOfPerformance.csv"), rows("organisation.csv")
+              classes = rows("classification.csv")
+          def key(x): return (x.get("noticeIdentifier","").strip(), x.get("noticeVersion","").strip())
+          pg={}
+          for x in purposes: pg.setdefault(key(x), []).append(x)
+          lg={}
+          for x in places: lg.setdefault(key(x), []).append(x)
+          og={}
+          for x in orgs: og.setdefault(key(x), []).append(x)
+          cg={}
+          for x in classes: cg.setdefault(key(x), []).append(x)
+          terms=("holzpellet","pelletlieferung","pellets","holzhackschnitzel","holzbrennstoff",
+                 "brennstoffe auf holzbasis","bks","braunkohlestaub","braunkohle","steinkohle","kohle","brikett")
+          hits=0
+          for n in notices:
+              k=key(n); ps=pg.get(k,[])
+              title=" | ".join(x.get("title","") for x in ps)
+              desc=" | ".join(x.get("description","") for x in ps)
+              blob=(title+" "+desc).lower()
+              if not any(t in blob for t in terms): continue
+              hits+=1
+              print("\nCANDIDATE", hits, "ID", k, "title", title[:300], "description", desc[:500])
+              print("NOTICE:", n)
+              print("PLACES:", lg.get(k,[]))
+              print("ORGANISATIONS:", og.get(k,[]))
+              print("CLASSIFICATIONS:", cg.get(k,[]))
+          print("\nKEYWORD CANDIDATES TOTAL:", hits)
+          print("\nALL UNIQUE PLACE SUBDIVISIONS:")
+          print(sorted({(x.get("placePerformanceCountrySubdivision",""),x.get("placePerformanceCountryCode","")) for x in places}))
+          print("\nALL UNIQUE ORGANISATION SUBDIVISIONS:")
+          print(sorted({(x.get("organisationCountrySubdivision",""),x.get("organisationCountryCode","")) for x in orgs}))
+          PY
