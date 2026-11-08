@@ -77,19 +77,19 @@ def _category(title, description, cpv):
         return None
     procurement = ("liefer", "beschaffung", "bedarf", "rahmenvereinbarung",
         "brennstoff", "versorgung", "abnahme")
-    if re.search(r"holz[\\s-]*pellet|pellet[\\s-]*holz|wood[\\s-]*pellet", title_text):
+    if re.search(r"holz[\s-]*pellet|pellet[\s-]*holz|wood[\s-]*pellet", title_text):
         if any(term in title_text for term in procurement) or any(
             term in description_text for term in ("liefer", "beschaffung", "bedarf", "brennstoff", "versorgung")
         ):
             return "Holzpellets eindeutig"
         return None
-    if re.search(r"holz[\\s-]*hack[\\s-]*schnitzel|hackschnitzel|wood[\\s-]*chips", title_text):
+    if re.search(r"holz[\s-]*hack[\s-]*schnitzel|hackschnitzel|wood[\s-]*chips", title_text):
         if any(term in title_text + " " + description_text for term in procurement):
             return "Holzhackschnitzel – prüfen"
         return None
-    if re.search(r"holzbrikett|wood[\\s-]*briquette|holzbrennstoff|wood[\\s-]*fuel", title_text):
+    if re.search(r"holzbrikett|wood[\s-]*briquette|holzbrennstoff|wood[\s-]*fuel", title_text):
         return "Sonstiger Holzbrennstoff"
-    if re.search(r"\\bbks\\b|braunkohle|steinkohle|\\bkohle\\b", title_text):
+    if re.search(r"\bbks\b|braunkohle|steinkohle|\bkohle\b", title_text):
         return "BKS / Kohle / Briketts"
     if "pellet" in title_text and any(term in title_text + " " + description_text for term in procurement):
         return "Pellets – Holzart prüfen"
