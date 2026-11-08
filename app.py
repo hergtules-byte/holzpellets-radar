@@ -406,10 +406,39 @@ with st.expander("Suchstatistik und technische Details"):
 
 st.divider()
 
-st.caption(
-    "Pellet und Kohle-Ausschreibungsradar | "
-    "Datenquellen: Vergabeweiser, Bekanntmachungsservice und TED"
-)
+# Quellenangabe links und manueller Refresh rechts
+source_col, refresh_col = st.columns([4, 1], vertical_alignment="bottom")
+
+with source_col:
+    st.markdown("**Durchsuchte Quellen**")
+    paused_until = statistics.get("vergabeweiser_paused_until")
+
+    if paused_until:
+        st.markdown(
+            "- [Vergabeweiser](https://www.vergabeweiser.de/) "
+            f"– derzeit pausiert (Rate-Limit; bis {paused_until})"
+        )
+    else:
+        st.markdown(
+            "- [Vergabeweiser](https://www.vergabeweiser.de/)"
+        )
+
+    st.markdown(
+        "- [Bekanntmachungsservice](https://oeffentlichevergabe.de/) "
+        "– offizieller CSV-Tagesexport"
+    )
+    st.markdown(
+        "- [TED](https://ted.europa.eu/) "
+        "– EU-weite Ausschreibungsdatenbank"
+    )
+
+with refresh_col:
+    if st.button(
+        "↻ Aktualisieren",
+        use_container_width=True,
+        help="Ansicht und gespeicherte Ausschreibungsdaten erneut laden"
+    ):
+        st.rerun()
 
 st.caption(
     "Bitte Angebotsfristen und Vergabeunterlagen "
