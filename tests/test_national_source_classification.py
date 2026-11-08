@@ -77,5 +77,45 @@ class NationalSourceClassificationTests(unittest.TestCase):
         )
 
 
+    def test_real_bauhof_hackschnitzel_hall_is_not_fuel_delivery(self):
+        self.assertIsNone(
+            _category(
+                "Neubau Bauhof Greifswald",
+                "Los 505.1 Hackschnitzelhalle – freitragende offene Lagerhalle "
+                "einschließlich Fundamenten",
+                ["45213200"],
+            )
+        )
+
+    def test_real_school_playground_hackschnitzel_are_fall_protection(self):
+        self.assertIsNone(
+            _category(
+                "Neubau einer Grundschule – Außenanlagen",
+                "Spielbereiche: Holzhackschnitzel als Fallschutz auf 650 m2",
+                ["45112710", "45214210"],
+            )
+        )
+
+    def test_real_biomass_boiler_notice_is_equipment_not_fuel(self):
+        self.assertIsNone(
+            _category(
+                "Biomassekesselanlage 2x 1400 kW Leistung",
+                "Lieferung und Montage von Holzhackschnitzelfeuerungsanlagen "
+                "einschließlich Nebenanlagen",
+                ["09324000"],
+            )
+        )
+
+    def test_real_polymer_compounding_notice_is_not_wood_fuel(self):
+        self.assertIsNone(
+            _category(
+                "Mikrocompoundier- und Spritzgießsystem inklusive Rheologischer Analyse",
+                "Extruder, Dosiersystem und Spritzgießanlage zur Verarbeitung "
+                "von Polymeren und Kunststoffpellets",
+                ["38430000", "42994000"],
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
