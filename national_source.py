@@ -1,30 +1,21 @@
-"""Abruf und Auswertung des offiziellen Bekanntmachungsservice OpenData-Exports."""
+"""Importiert passende Bekanntmachungen aus dem CSV-OpenData-Export."""
+import csv
 import io
-import json
 import re
 import zipfile
+from collections import defaultdict
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import requests
 
 API_URL = "https://oeffentlichevergabe.de/api/notice-exports"
-STATE_PREFIXES = {
-    "Brandenburg": ("DE4",),
-    "Mecklenburg-Vorpommern": ("DE8",),
-    "Sachsen": ("DED",),
-    "Sachsen-Anhalt": ("DEE",),
-    "Thüringen": ("DEG",),
-}
-STATE_NAMES = {
-    "brandenburg": "Brandenburg",
-    "mecklenburg-vorpommern": "Mecklenburg-Vorpommern",
-    "mecklenburg vorpommern": "Mecklenburg-Vorpommern",
-    "sachsen": "Sachsen",
-    "sachsen-anhalt": "Sachsen-Anhalt",
-    "sachsen anhalt": "Sachsen-Anhalt",
-    "thüringen": "Thüringen",
-    "thueringen": "Thüringen",
+STATE_CODES = {
+    "DE40": "Brandenburg",
+    "DE80": "Mecklenburg-Vorpommern",
+    "DED2": "Sachsen",
+    "DEE0": "Sachsen-Anhalt",
+    "DEG0": "Thüringen",
 }
 SEARCH_TERMS = (
     "holzpellet", "pelletlieferung", "pellets", "holzhackschnitzel",
@@ -33,29 +24,22 @@ SEARCH_TERMS = (
 )
 
 
-def _flatten(value):
-    if isinstance(value, dict):
-        return " ".join(_flatten(v) for v in value.values())
-    if isinstance(value, list):
-        return " ".join(_flatten(v) for v in value)
-    if isinstance(value, (str, int, float)):
-        return str(value)
-    return ""
+def _read_table(archive, filename):
+    try:
+        raw = archive.read(filename)
+    except KeyError:
+        return []
+    text = io.TextIOWrapper(io.BytesIO(raw), encoding="utf-8-sig", newline="")
+    return list(csv.DictReader(text))
 
 
-def _find_state(release, combined_text):
-    # Erst explizite Bundeslandangaben aus Orts-/Adressdaten auswerten.
-    lowered = combined_text.lower()
-    for needle, state in STATE_NAMES.items():
-        if re.search(r"(?<![a-zäöü])" + re.escape(needle) + r"(?![a-zäöü])", lowered):
-            return state
+def _join_key(row):
+    return (str(row.get("noticeIdentifier", "")).strip(),
+            str(row.get("noticeVersion", "")).strip())
 
-    # NUTS-1-Codes der fünf Länder.
-    upper = combined_text.upper()
-    for state, prefixes in STATE_PREFIXES.items():
-        if any(re.search(r"(?<![A-Z0-9])" + p + r"[A-Z0-9]{0,2}", upper) for p in prefixes):
-            return state
-    return None
+
+def _text(value):
+    return str(value or "").strip()
 
 
 def _category(text, cpv_codes):
@@ -76,98 +60,121 @@ def _category(text, cpv_codes):
 
 
 def fetch_national_notices():
-    """Lädt den vollständigen Vortagesexport und gibt passende Treffer zurück."""
-    yesterday = (datetime.now(ZoneInfo("Europe/Berlin")).date() - timedelta(days=1))
-    params = {"pubDay": yesterday.isoformat(), "format": "ocds.zip"}
-    response = requests.get(API_URL, params=params, timeout=(20, 180))
+    """Lädt CSV-Export des abgeschlossenen Vortages und filtert fünf Bundesländer."""
+    day = datetime.now(ZoneInfo("Europe/Berlin")).date() - timedelta(days=1)
+    response = requests.get(
+        API_URL,
+        params={"pubDay": day.isoformat(), "format": "csv.zip"},
+        timeout=(20, 180),
+    )
     response.raise_for_status()
-
     if not response.content.startswith(b"PK"):
-        raise ValueError("Der Bekanntmachungsservice hat keine gültige ZIP-Datei geliefert.")
+        raise ValueError("Bekanntmachungsservice lieferte keine gültige ZIP-Datei.")
+
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        notices = _read_table(archive, "notice.csv")
+        purposes = _read_table(archive, "purpose.csv")
+        organisations = _read_table(archive, "organisation.csv")
+        places = _read_table(archive, "placeOfPerformance.csv")
+        classifications = _read_table(archive, "classification.csv")
+        submissions = _read_table(archive, "submissionTerms.csv")
+
+    def group(rows):
+        result = defaultdict(list)
+        for row in rows:
+            result[_join_key(row)].append(row)
+        return result
+
+    purpose_by = group(purposes)
+    org_by = group(organisations)
+    place_by = group(places)
+    class_by = group(classifications)
+    submission_by = group(submissions)
 
     found = {}
-    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
-        for filename in archive.namelist():
-            if filename.endswith("/") or not filename.lower().endswith(".json"):
-                continue
-            try:
-                payload = json.loads(archive.read(filename))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                continue
+    stats = {"publication_day": day.isoformat(), "notices_in_export": len(notices),
+             "matched_keyword": 0, "matched_state": 0, "results": 0}
+    for notice in notices:
+        key = _join_key(notice)
+        p_rows = purpose_by.get(key, [])
+        o_rows = org_by.get(key, [])
+        pl_rows = place_by.get(key, [])
+        c_rows = class_by.get(key, [])
+        s_rows = submission_by.get(key, [])
 
-            releases = payload.get("releases", []) if isinstance(payload, dict) else []
-            for release in releases:
-                if not isinstance(release, dict):
-                    continue
-                tags = release.get("tag") or []
-                # Zuschlags-/Ergebnisbekanntmachungen sind keine offenen Verkaufschancen.
-                if tags and "tender" not in tags and "planning" not in tags:
-                    continue
+        title = " | ".join(dict.fromkeys(_text(r.get("title")) for r in p_rows if _text(r.get("title"))))
+        description = " | ".join(dict.fromkeys(_text(r.get("description")) for r in p_rows if _text(r.get("description"))))
+        buyer_rows = [r for r in o_rows if _text(r.get("organisationRole")).lower() == "buyer"]
+        buyer = buyer_rows[0] if buyer_rows else {}
+        cpv_codes = []
+        for row in c_rows:
+            if _text(row.get("classificationType")).lower() == "cpv":
+                cpv_codes.extend(x.strip() for x in (
+                    _text(row.get("mainClassificationCode")) + "," +
+                    _text(row.get("additionalClassificationCodes"))
+                ).split(",") if x.strip())
 
-                tender = release.get("tender") or {}
-                parties = release.get("parties") or []
-                buyer = next(
-                    (p for p in parties if "buyer" in (p.get("roles") or [])),
-                    {},
-                )
-                title = tender.get("title") or ""
-                description = tender.get("description") or ""
-                item_text = _flatten(tender.get("items") or [])
-                cpv_codes = []
-                for item in tender.get("items") or []:
-                    classification = item.get("classification") or {}
-                    code = classification.get("id")
-                    if code:
-                        cpv_codes.append(str(code))
+        search_text = " ".join((title, description, _text(notice.get("noticeType"))))
+        if not any(term in search_text.lower() for term in SEARCH_TERMS):
+            continue
+        stats["matched_keyword"] += 1
 
-                full_text = " ".join((title, description, item_text, _flatten(tender), _flatten(buyer)))
-                if not any(term in full_text.lower() for term in SEARCH_TERMS):
-                    continue
+        state = None
+        place = ""
+        for row in pl_rows:
+            code = _text(row.get("placePerformanceCountrySubdivision")).upper()
+            if code in STATE_CODES:
+                state = STATE_CODES[code]
+                place = " ".join(filter(None, (
+                    _text(row.get("placePerformancePostCode")),
+                    _text(row.get("placePerformanceCity")),
+                )))
+                break
+        if not state:
+            for row in o_rows:
+                code = _text(row.get("organisationCountrySubdivision")).upper()
+                if code in STATE_CODES:
+                    state = STATE_CODES[code]
+                    place = _text(row.get("organisationCity"))
+                    break
+        if not state:
+            continue
+        stats["matched_state"] += 1
 
-                state = _find_state(release, " ".join((_flatten(tender), _flatten(buyer))))
-                if not state:
-                    continue
+        category = _category(search_text, cpv_codes)
+        if not category:
+            continue
 
-                category = _category(full_text, cpv_codes)
-                if not category:
-                    continue
+        notice_id = _text(notice.get("noticeIdentifier"))
+        version = _text(notice.get("noticeVersion"))
+        url = "https://oeffentlichevergabe.de/ui/de/search/details?noticeId=" + notice_id
+        estimate = next((_text(r.get("estimatedValue")) for r in p_rows if _text(r.get("estimatedValue"))), "")
+        deadline = next((_text(r.get("tenderValidityDeadline")) for r in s_rows if _text(r.get("tenderValidityDeadline"))), "")
+        record = {
+            "id": notice_id,
+            "state": state,
+            "title": title or "Ausschreibung ohne Titel",
+            "original_title": title,
+            "buyer": _text(buyer.get("organisationName")),
+            "place": place or state,
+            "deadline": deadline,
+            "published": _text(notice.get("publicationDate")) or day.isoformat(),
+            "url": url,
+            "documents_url": "",
+            "notice_url": url,
+            "description": description,
+            "cpv": ", ".join(sorted(set(cpv_codes))),
+            "gewerk": "",
+            "estimated_value": estimate,
+            "search_term": "Bekanntmachungsservice OpenData",
+            "woodpellet_check": category,
+            "source": "Bekanntmachungsservice",
+            "notice_version": version,
+            "notice_tag": _text(notice.get("noticeType")),
+        }
+        previous = found.get(notice_id)
+        if previous is None or version >= previous.get("notice_version", ""):
+            found[notice_id] = record
 
-                notice_id = str(release.get("id") or payload.get("id") or filename)
-                version = str(release.get("version") or "")
-                dedupe_key = notice_id
-                url = (
-                    "https://oeffentlichevergabe.de/ui/de/search/details?noticeId="
-                    + notice_id
-                )
-                buyer_address = buyer.get("address") or {}
-                place = tender.get("items") or []
-                location_text = _flatten(place) or _flatten(buyer_address)
-
-                record = {
-                    "id": notice_id,
-                    "state": state,
-                    "title": title or "Ausschreibung ohne Titel",
-                    "original_title": title,
-                    "buyer": buyer.get("name") or "",
-                    "place": location_text[:300] or state,
-                    "deadline": "",
-                    "published": release.get("date") or yesterday.isoformat(),
-                    "url": url,
-                    "documents_url": "",
-                    "notice_url": url,
-                    "description": description,
-                    "cpv": ", ".join(sorted(set(cpv_codes))),
-                    "gewerk": "",
-                    "estimated_value": (tender.get("value") or {}).get("amount"),
-                    "search_term": "Bekanntmachungsservice OpenData",
-                    "woodpellet_check": category,
-                    "source": "Bekanntmachungsservice",
-                    "notice_version": version,
-                    "notice_tag": ", ".join(tags),
-                }
-                # Bei mehreren Versionen derselben Bekanntmachung die letzte behalten.
-                previous = found.get(dedupe_key)
-                if previous is None or version >= previous.get("notice_version", ""):
-                    found[dedupe_key] = record
-
-    return list(found.values()), yesterday.isoformat()
+    stats["results"] = len(found)
+    return list(found.values()), stats
