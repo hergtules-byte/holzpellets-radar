@@ -1,6 +1,26 @@
 {
-  "updated_at": "2026-11-08T22:36:21+01:00",
+  "updated_at": "2026-11-09T07:13:54+01:00",
   "results": [
+    {
+      "id": "4eb11e96",
+      "state": "Mecklenburg-Vorpommern",
+      "title": "Biomassekesselanlage 2x 1400 kW Leistung",
+      "original_title": "Biomassekesselanlage 2x 1400 kW Leistung",
+      "buyer": "Bützower Wärme GmbH",
+      "place": "Bützow",
+      "deadline": "Angebotsfrist",
+      "published": "2026-11-03",
+      "url": "https://vergabeweiser.de/ausschreibung/biomassekesselanlage-2x-1400-kw-leistung-4eb11e96",
+      "documents_url": "https://evergabe-mv.de/Satellite/notice/CXVHYH3DYH2920RM/documents",
+      "notice_url": "https://oeffentlichevergabe.de/ui/de/search/details?noticeId=4eb11e96-7aa6-4586-a22f-30bbc4aa0563",
+      "description": "Lieferung und Montageleistung einer Holzhackschnitzelfeuerungsanlagen mit jeweils 1.400 kW Nennwärmeleistung (zusammen 2.800 kW)",
+      "cpv": "09324000",
+      "gewerk": "Strom, Gas und Brennstoffe",
+      "estimated_value": null,
+      "search_term": "Pellets",
+      "woodpellet_check": "Holzhackschnitzel – prüfen",
+      "source": "Vergabeweiser"
+    },
     {
       "id": "740051-2026",
       "state": "Sachsen",
@@ -20,32 +40,471 @@
       "search_term": "TED Search API",
       "woodpellet_check": "Holzbrennstoff – CPV 09111400",
       "source": "TED"
+    },
+    {
+      "id": "5efb590f",
+      "state": "Thüringen",
+      "title": "Heizung / Sanitär / Elektro",
+      "original_title": "Heizung / Sanitär / Elektro",
+      "buyer": "Landratsamt Saale-Holzland-Kreis",
+      "place": "Renthendorf",
+      "deadline": "Angebotsfrist",
+      "published": "2026-10-16",
+      "url": "https://vergabeweiser.de/ausschreibung/heizung-sanitaer-elektro-5efb590f",
+      "documents_url": "https://www.staatsanzeiger-eservices.de/aJs/EFormsBekVuUrl?z_param=331072",
+      "notice_url": "https://oeffentlichevergabe.de/ui/de/search/details?noticeId=5efb590f-ee39-471a-a031-d17185b346e2",
+      "description": "Brehm - SchullandheimUmstellung der Wärmeerzeugung von Öl- auf Pelletfeuerung",
+      "cpv": "45331000",
+      "gewerk": "Sanitär, Heizung, Klima",
+      "estimated_value": null,
+      "search_term": "Holz",
+      "woodpellet_check": "Pellets – Holzart prüfen",
+      "source": "Vergabeweiser"
     }
   ],
-  "errors": [
-    "HTTP 429; Vergabeweiser pausiert bis 2026-11-09T05:53:41.643542+00:00"
+  "errors": [],
+  "search_stats": [
+    {
+      "state": "Brandenburg",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Holzpelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Pellets",
+      "page": 1,
+      "total": 4,
+      "received": 4
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Holzhackschnitzel",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Holzbrennstoffe",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Brennstoffe auf Holzbasis",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Holz",
+      "page": 1,
+      "total": 9,
+      "received": 9
+    },
+    {
+      "state": "Brandenburg",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Brandenburg",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Holzpelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Pellets",
+      "page": 1,
+      "total": 11,
+      "received": 11
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Holzhackschnitzel",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Holzbrennstoffe",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Brennstoffe auf Holzbasis",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Holz",
+      "page": 1,
+      "total": 4,
+      "received": 4
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Mecklenburg-Vorpommern",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Holzpelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Pellets",
+      "page": 1,
+      "total": 3,
+      "received": 3
+    },
+    {
+      "state": "Sachsen",
+      "term": "Holzhackschnitzel",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Holzbrennstoffe",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Brennstoffe auf Holzbasis",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Holz",
+      "page": 1,
+      "total": 6,
+      "received": 6
+    },
+    {
+      "state": "Sachsen",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Holzpelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Pellets",
+      "page": 1,
+      "total": 2,
+      "received": 2
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Holzhackschnitzel",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Holzbrennstoffe",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Brennstoffe auf Holzbasis",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Holz",
+      "page": 1,
+      "total": 2,
+      "received": 2
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Sachsen-Anhalt",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Holzpellets",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Holzpelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Pelletlieferung",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Pellets",
+      "page": 1,
+      "total": 5,
+      "received": 5
+    },
+    {
+      "state": "Thüringen",
+      "term": "Holzhackschnitzel",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Holzbrennstoffe",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Brennstoffe auf Holzbasis",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Holz",
+      "page": 1,
+      "total": 7,
+      "received": 7
+    },
+    {
+      "state": "Thüringen",
+      "term": "BKS",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Braunkohlestaub",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Kohle",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    },
+    {
+      "state": "Thüringen",
+      "term": "Briketts",
+      "page": 1,
+      "total": 0,
+      "received": 0
+    }
   ],
-  "search_stats": [],
   "statistics": {
     "states": 5,
     "search_terms": 12,
-    "search_requests": 0,
-    "candidates": 0,
-    "detail_requests": 0,
-    "total_results": 1,
+    "search_requests": 60,
+    "candidates": 53,
+    "detail_requests": 53,
+    "total_results": 3,
     "cross_source_duplicates_merged": 0,
     "confirmed_woodpellets": 0,
     "cpv_wood_fuels": 1,
-    "manual_review": 0,
+    "manual_review": 2,
     "other_fuels_bks_coal_briquettes": 0,
-    "errors": 1,
+    "errors": 0,
     "national_source_results": 0,
-    "national_source_publication_day": "2026-11-07",
+    "national_source_publication_day": "2026-11-08",
     "ted_source_results": 1,
-    "ted_source_since": "20260909",
+    "ted_source_since": "20260910",
     "ted_source_queries": 12,
-    "ted_source_raw_notices": 56,
+    "ted_source_raw_notices": 57,
     "ted_source_errors": 0,
-    "vergabeweiser_paused_until": "2026-11-09T05:53:41.643542+00:00"
+    "vergabeweiser_paused_until": null
   }
 }
