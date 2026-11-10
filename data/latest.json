@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-09T07:13:54+01:00",
+  "updated_at": "2026-11-10T06:59:25+01:00",
   "results": [
     {
       "id": "4eb11e96",
@@ -173,8 +173,8 @@
       "state": "Mecklenburg-Vorpommern",
       "term": "Pellets",
       "page": 1,
-      "total": 11,
-      "received": 11
+      "total": 12,
+      "received": 12
     },
     {
       "state": "Mecklenburg-Vorpommern",
@@ -257,8 +257,8 @@
       "state": "Sachsen",
       "term": "Pellets",
       "page": 1,
-      "total": 3,
-      "received": 3
+      "total": 4,
+      "received": 4
     },
     {
       "state": "Sachsen",
@@ -425,8 +425,8 @@
       "state": "Thüringen",
       "term": "Pellets",
       "page": 1,
-      "total": 5,
-      "received": 5
+      "total": 9,
+      "received": 9
     },
     {
       "state": "Thüringen",
@@ -453,8 +453,8 @@
       "state": "Thüringen",
       "term": "Holz",
       "page": 1,
-      "total": 7,
-      "received": 7
+      "total": 8,
+      "received": 8
     },
     {
       "state": "Thüringen",
@@ -489,8 +489,8 @@
     "states": 5,
     "search_terms": 12,
     "search_requests": 60,
-    "candidates": 53,
-    "detail_requests": 53,
+    "candidates": 60,
+    "detail_requests": 60,
     "total_results": 3,
     "cross_source_duplicates_merged": 0,
     "confirmed_woodpellets": 0,
@@ -499,9 +499,9 @@
     "other_fuels_bks_coal_briquettes": 0,
     "errors": 0,
     "national_source_results": 0,
-    "national_source_publication_day": "2026-11-08",
+    "national_source_publication_day": "2026-11-09",
     "ted_source_results": 1,
-    "ted_source_since": "20260910",
+    "ted_source_since": "20260911",
     "ted_source_queries": 12,
     "ted_source_raw_notices": 57,
     "ted_source_errors": 0,
