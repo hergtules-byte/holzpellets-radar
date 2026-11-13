@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-12T07:10:01+01:00",
+  "updated_at": "2026-11-13T07:06:03+01:00",
   "results": [
     {
       "id": "4eb11e96",
@@ -40,26 +40,6 @@
       "search_term": "TED Search API",
       "woodpellet_check": "Holzbrennstoff – CPV 09111400",
       "source": "TED"
-    },
-    {
-      "id": "5efb590f",
-      "state": "Thüringen",
-      "title": "Heizung / Sanitär / Elektro",
-      "original_title": "Heizung / Sanitär / Elektro",
-      "buyer": "Landratsamt Saale-Holzland-Kreis",
-      "place": "Renthendorf",
-      "deadline": "Angebotsfrist",
-      "published": "2026-10-16",
-      "url": "https://vergabeweiser.de/ausschreibung/heizung-sanitaer-elektro-5efb590f",
-      "documents_url": "https://www.staatsanzeiger-eservices.de/aJs/EFormsBekVuUrl?z_param=331072",
-      "notice_url": "https://oeffentlichevergabe.de/ui/de/search/details?noticeId=5efb590f-ee39-471a-a031-d17185b346e2",
-      "description": "Brehm - SchullandheimUmstellung der Wärmeerzeugung von Öl- auf Pelletfeuerung",
-      "cpv": "45331000",
-      "gewerk": "Sanitär, Heizung, Klima",
-      "estimated_value": null,
-      "search_term": "Holz",
-      "woodpellet_check": "Pellets – Holzart prüfen",
-      "source": "Vergabeweiser"
     }
   ],
   "errors": [],
@@ -173,8 +153,8 @@
       "state": "Mecklenburg-Vorpommern",
       "term": "Pellets",
       "page": 1,
-      "total": 13,
-      "received": 13
+      "total": 10,
+      "received": 10
     },
     {
       "state": "Mecklenburg-Vorpommern",
@@ -257,8 +237,8 @@
       "state": "Sachsen",
       "term": "Pellets",
       "page": 1,
-      "total": 4,
-      "received": 4
+      "total": 3,
+      "received": 3
     },
     {
       "state": "Sachsen",
@@ -285,8 +265,8 @@
       "state": "Sachsen",
       "term": "Holz",
       "page": 1,
-      "total": 6,
-      "received": 6
+      "total": 5,
+      "received": 5
     },
     {
       "state": "Sachsen",
@@ -369,8 +349,8 @@
       "state": "Sachsen-Anhalt",
       "term": "Holz",
       "page": 1,
-      "total": 2,
-      "received": 2
+      "total": 3,
+      "received": 3
     },
     {
       "state": "Sachsen-Anhalt",
@@ -453,8 +433,8 @@
       "state": "Thüringen",
       "term": "Holz",
       "page": 1,
-      "total": 6,
-      "received": 6
+      "total": 5,
+      "received": 5
     },
     {
       "state": "Thüringen",
@@ -489,19 +469,19 @@
     "states": 5,
     "search_terms": 12,
     "search_requests": 60,
-    "candidates": 59,
-    "detail_requests": 59,
-    "total_results": 3,
+    "candidates": 54,
+    "detail_requests": 54,
+    "total_results": 2,
     "cross_source_duplicates_merged": 0,
     "confirmed_woodpellets": 0,
     "cpv_wood_fuels": 1,
-    "manual_review": 2,
+    "manual_review": 1,
     "other_fuels_bks_coal_briquettes": 0,
     "errors": 0,
     "national_source_results": 0,
-    "national_source_publication_day": "2026-11-11",
+    "national_source_publication_day": "2026-11-12",
     "ted_source_results": 1,
-    "ted_source_since": "20260913",
+    "ted_source_since": "20260914",
     "ted_source_queries": 12,
     "ted_source_raw_notices": 57,
     "ted_source_errors": 0,
