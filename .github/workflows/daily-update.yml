@@ -1,4 +1,3 @@
-
 name: Tägliches Holzpellets-Radar
 
 on:
@@ -30,16 +29,22 @@ jobs:
           VERGABEWEISER_API_KEY: ${{ secrets.VERGABEWEISER_API_KEY }}
         run: python update_data.py
 
-     
-      - name: Ergebnisse speichern
+      - name: E-Mail bei neuen Ausschreibungen versenden
+        continue-on-error: true
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_TO: andrei.hergt@web.de
+        run: python notify_new_results.py
+
+      - name: Ergebnisse und Benachrichtigungsstatus speichern
         run: |
           git config user.name "Holzpellets Radar Bot"
           git config user.email "actions@users.noreply.github.com"
 
-          git add data/latest.json
+          git add data/latest.json data/notified_ids.json
 
           git diff --cached --quiet || git commit -m "Tägliche Aktualisierung"
 
           git pull --rebase -X theirs origin main
           git push origin HEAD:main
-
