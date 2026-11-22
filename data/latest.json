@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-21T07:00:53+01:00",
+  "updated_at": "2026-11-22T07:02:55+01:00",
   "results": [
     {
       "id": "4eb11e96",
@@ -265,8 +265,8 @@
       "state": "Sachsen",
       "term": "Holz",
       "page": 1,
-      "total": 7,
-      "received": 7
+      "total": 8,
+      "received": 8
     },
     {
       "state": "Sachsen",
@@ -433,8 +433,8 @@
       "state": "Thüringen",
       "term": "Holz",
       "page": 1,
-      "total": 10,
-      "received": 10
+      "total": 9,
+      "received": 9
     },
     {
       "state": "Thüringen",
@@ -479,9 +479,9 @@
     "other_fuels_bks_coal_briquettes": 0,
     "errors": 0,
     "national_source_results": 0,
-    "national_source_publication_day": "2026-11-20",
+    "national_source_publication_day": "2026-11-21",
     "ted_source_results": 1,
-    "ted_source_since": "20260922",
+    "ted_source_since": "20260923",
     "ted_source_queries": 12,
     "ted_source_raw_notices": 55,
     "ted_source_errors": 0,
